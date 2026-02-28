@@ -32,20 +32,12 @@ class CreatePlayerScene extends Scene {
       fontSize: width * 0.04
     });
 
-    // 性别选择标签
-    this.addButton(centerX - width * 0.35, height * 0.42, width * 0.3, height * 0.08, '选择性别:', () => {}, {
-      bgColor: 'transparent',
-      textColor: '#8892b0',
-      borderColor: 'transparent',
-      fontSize: width * 0.035
-    });
-
     // 男性按钮
     this.addButton(centerX - width * 0.25, height * 0.52, width * 0.22, height * 0.1, '👨 男', () => {
       this.selectedGender = 'male';
       this.setupGenderButtons();
     }, {
-      bgColor: 'rgba(100, 255, 218, 0.2)',
+      bgColor: 'rgba(255, 255, 255, 0.05)',
       textColor: '#64ffda',
       borderColor: '#64ffda',
       fontSize: width * 0.04
@@ -86,19 +78,19 @@ class CreatePlayerScene extends Scene {
     const femaleBtn = this.buttons[3];
 
     if (this.selectedGender === 'male') {
-      maleBtn.bgColor = 'rgba(100, 255, 218, 0.2)';
-      maleBtn.textColor = '#64ffda';
-      maleBtn.borderColor = '#64ffda';
-      femaleBtn.bgColor = 'rgba(255, 255, 255, 0.05)';
-      femaleBtn.textColor = '#8892b0';
-      femaleBtn.borderColor = 'rgba(255, 255, 255, 0.2)';
+      maleBtn.style.bgColor = 'rgba(100, 255, 218, 0.2)';
+      maleBtn.style.textColor = '#64ffda';
+      maleBtn.style.borderColor = '#64ffda';
+      femaleBtn.style.bgColor = 'rgba(255, 255, 255, 0.05)';
+      femaleBtn.style.textColor = '#8892b0';
+      femaleBtn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
     } else {
-      maleBtn.bgColor = 'rgba(255, 255, 255, 0.05)';
-      maleBtn.textColor = '#8892b0';
-      maleBtn.borderColor = 'rgba(255, 255, 255, 0.2)';
-      femaleBtn.bgColor = 'rgba(255, 182, 193, 0.2)';
-      femaleBtn.textColor = '#ffb6c1';
-      femaleBtn.borderColor = '#ffb6c1';
+      maleBtn.style.bgColor = 'rgba(255, 255, 255, 0.05)';
+      maleBtn.style.textColor = '#8892b0';
+      maleBtn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+      femaleBtn.style.bgColor = 'rgba(255, 182, 193, 0.2)';
+      femaleBtn.style.textColor = '#ffb6c1';
+      femaleBtn.style.borderColor = '#ffb6c1';
     }
   }
 
@@ -137,12 +129,15 @@ class CreatePlayerScene extends Scene {
 
   render(ctx) {
     const { width, height } = this.getCanvasSize();
+    const centerX = width / 2;
 
     // 背景 - 统一方法
     this.drawBackground(ctx);
 
     // 标题 - 统一方法
     this.drawTitle(ctx, '创建你的球员');
+
+    this.drawCard(ctx, centerX - width * 0.35, height * 0.42, width * 0.3, height * 0.08, '选择性别:');
 
     // 绘制UI元素 - 统一方法
     this.renderButtons(ctx);
