@@ -119,9 +119,16 @@ class CreatePlayerScene extends Scene {
     this.game.player = new Player(name, this.selectedGender);
     this.game.gameData = {
       month: 1,
+      week: 1,
       year: 2024,
       gameActive: true,
-      specialEvents: []
+      specialEvents: [],
+      actionHistory: {},
+      ongoingTournament: null,
+      weeklyActions: {
+        trainingRestCount: 0,
+        matchCount: 0
+      }
     };
     this.game.saveGame();
     this.game.changeScene(GAME_STATE.HOME);
