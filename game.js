@@ -334,22 +334,50 @@ class Game {
 
   // 检查训练/休息次数限制
   canDoTrainingOrRest() {
+    // 兼容处理：确保 weeklyActions 存在
+    if (!this.gameData.weeklyActions) {
+      this.gameData.weeklyActions = {
+        trainingRestCount: 0,
+        matchCount: 0
+      };
+    }
     return this.gameData.weeklyActions.trainingRestCount < this.WEEKLY_LIMITS.MAX_TRAINING_REST;
   }
 
   // 检查比赛次数限制
   canPlayMatch() {
+    // 兼容处理：确保 weeklyActions 存在
+    if (!this.gameData.weeklyActions) {
+      this.gameData.weeklyActions = {
+        trainingRestCount: 0,
+        matchCount: 0
+      };
+    }
     return this.gameData.weeklyActions.matchCount < this.WEEKLY_LIMITS.MAX_MATCH;
   }
 
   // 增加训练/休息次数
   addTrainingRestAction() {
+    // 兼容处理：确保 weeklyActions 存在
+    if (!this.gameData.weeklyActions) {
+      this.gameData.weeklyActions = {
+        trainingRestCount: 0,
+        matchCount: 0
+      };
+    }
     this.gameData.weeklyActions.trainingRestCount++;
     this.saveGame();
   }
 
   // 增加比赛次数
   addMatchAction() {
+    // 兼容处理：确保 weeklyActions 存在
+    if (!this.gameData.weeklyActions) {
+      this.gameData.weeklyActions = {
+        trainingRestCount: 0,
+        matchCount: 0
+      };
+    }
     this.gameData.weeklyActions.matchCount++;
     this.saveGame();
   }
@@ -365,9 +393,40 @@ class Game {
 
   // 重置每周操作次数（进入新一周时调用）
   resetWeeklyActions() {
+    // 兼容处理：确保 weeklyActions 存在
+    if (!this.gameData.weeklyActions) {
+      this.gameData.weeklyActions = {
+        trainingRestCount: 0,
+        matchCount: 0
+      };
+    }
     this.gameData.weeklyActions.trainingRestCount = 0;
     this.gameData.weeklyActions.matchCount = 0;
     this.saveGame();
+  }
+
+  // 重置游戏（用于退役后重新开始）
+  resetGame() {
+    // 重置 gameData 到初始状态
+    this.gameData = {
+      month: 1,
+      week: 1,
+      year: 2024,
+      gameActive: true,
+      specialEvents: [],
+      actionHistory: {},
+      ongoingTournament: null,
+      weeklyActions: {
+        trainingRestCount: 0,
+        matchCount: 0
+      }
+    };
+    
+    // 重置 player
+    this.player = null;
+    
+    // 清除存储
+    wx.removeStorageSync('tennisGameData');
   }
 
   // 启动游戏循环

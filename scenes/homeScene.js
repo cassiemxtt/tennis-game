@@ -166,7 +166,7 @@ class HomeScene extends Scene {
     this.shouldScrollToBottom = false;
     // 否则保持当前位置
 
-    // 保存数据
+    // 保存数据（确保 gameData 变化后被保存）
     this.game.saveGame();
   }
 

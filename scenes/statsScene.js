@@ -10,8 +10,25 @@ class StatsScene extends Scene {
   }
 
   initUI() {
+    const { width, height } = this.getCanvasSize();
+    
     // 返回按钮 - 统一位置
     this.addBackButton(GAME_STATE.HOME);
+    
+    // 退役按钮 - 放在页面最下方
+    const btnWidth = width * 0.6;
+    const btnHeight = height * 0.055;
+    const btnX = (width - btnWidth) / 2;
+    const btnY = height * 0.92;
+    
+    this.addButton(btnX, btnY, btnWidth, btnHeight, '🏁 退役', () => {
+      // 调用 homeScene 的 retire 方法
+      this.game.scenes.home.retire();
+    }, {
+      bgColor: '#e53e3e',
+      textColor: '#ffffff',
+      fontSize: width * 0.035
+    });
   }
 
   render(ctx) {
@@ -84,36 +101,21 @@ class StatsScene extends Scene {
     this.drawProgressBar(ctx, cardX, height * 0.72, cardWidth, height * 0.02, player.calculateOverall(), CONFIG.THEME.PRIMARY);
 
     // 比赛记录
-    this.drawCard(ctx, cardX, height * 0.76, cardWidth, height * 0.12, '🎾 比赛记录');
+    this.drawCard(ctx, cardX, height * 0.76, cardWidth, height * 0.1, '🎾 比赛记录');
     const winRate = player.getWinRate();
 
     ctx.textAlign = 'center';
     ctx.fillStyle = CONFIG.THEME.TEXT_MAIN;
-    ctx.font = `bold ${width * 0.042}px sans-serif`;
-    ctx.fillText(`${player.matchesPlayed} 场`, cardX + cardWidth * 0.2, height * 0.84);
-    ctx.fillText(`${player.matchesWon} 胜`, cardX + cardWidth * 0.4, height * 0.84);
-    ctx.fillText(`${player.matchesPlayed - player.matchesWon} 负`, cardX + cardWidth * 0.6, height * 0.84);
-
-    ctx.fillStyle = winRate >= 50 ? CONFIG.THEME.GREEN : CONFIG.THEME.RED;
-    ctx.font = `bold ${width * 0.048}px sans-serif`;
-    ctx.fillText(`${winRate}%`, cardX + cardWidth * 0.8, height * 0.84);
+    ctx.font = `bold ${width * 0.038}px sans-serif`;
+    ctx.fillText(`${player.matchesPlayed} 场  ${player.matchesWon}胜 ${player.matchesPlayed - player.matchesWon}负  胜率 ${winRate}%`, width / 2, height * 0.83);
 
     // 荣誉成就
-    this.drawCard(ctx, cardX, height * 0.9, cardWidth, height * 0.08, '🌟 荣誉成就');
+    this.drawCard(ctx, cardX, height * 0.88, cardWidth, height * 0.06, '🌟 荣誉成就');
 
     ctx.textAlign = 'center';
     ctx.fillStyle = CONFIG.THEME.GOLD;
-    ctx.font = `bold ${width * 0.048}px sans-serif`;
-    ctx.fillText(`🏆 ${player.titles}`, cardX + cardWidth * 0.2, height * 0.97);
-    ctx.fillText(`🌟 ${player.grandSlams}`, cardX + cardWidth * 0.4, height * 0.97);
-    ctx.fillStyle = CONFIG.THEME.GOLD;
-    ctx.fillText(`💰 $${player.careerEarnings}`, cardX + cardWidth * 0.6, height * 0.97);
-
-    ctx.fillStyle = CONFIG.THEME.TEXT_SECONDARY;
-    ctx.font = `${width * 0.03}px sans-serif`;
-    ctx.fillText('冠军', cardX + cardWidth * 0.2, height * 0.99);
-    ctx.fillText('大满贯', cardX + cardWidth * 0.4, height * 0.99);
-    ctx.fillText('生涯奖金', cardX + cardWidth * 0.6, height * 0.99);
+    ctx.font = `bold ${width * 0.038}px sans-serif`;
+    ctx.fillText(`🏆 ${player.titles}冠军  🌟 ${player.grandSlams}大满贯  💰 $${player.careerEarnings}`, width / 2, height * 0.93);
 
     // 绘制按钮 - 统一方法
     this.renderButtons(ctx);
