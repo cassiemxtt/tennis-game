@@ -198,8 +198,8 @@ class Player {
       ageBonus = -5; // 年龄增长
     }
     
-    // 计算伤病惩罚
-    let injuryPenalty = {};
+    // 计算伤病惩罚 - 只有受伤时才传递伤病惩罚
+    let injuryPenalty = null;
     if (this.injury.isInjured) {
       const effect = this.getInjuryEffect();
       if (effect) {
@@ -207,8 +207,8 @@ class Player {
       }
     }
     
-    // 更新所有技能加成
-    this.skillManager.updateBonuses({
+    // 构建更新参数
+    const updateParams = {
       sponsorBonus: {
         baseline: Math.floor(10 * (sponsorMultiplier - 1)),
         volley: Math.floor(10 * (sponsorMultiplier - 1)),
@@ -223,9 +223,16 @@ class Player {
       },
       coachBonus: coachBonus,
       ageBonus: ageBonus,
-      form: this.form,
-      injuryPenalty: injuryPenalty
-    });
+      form: this.form
+    };
+    
+    // 只有受伤时才添加伤病惩罚
+    if (injuryPenalty) {
+      updateParams.injuryPenalty = injuryPenalty;
+    }
+    
+    // 更新所有技能加成
+    this.skillManager.updateBonuses(updateParams);
   }
   
   // 雇佣教练

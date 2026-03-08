@@ -3,6 +3,7 @@
  */
 const { Scene, GAME_STATE, CONFIG } = require('./scene.js');
 const { drawSkillCard, SKILL_ORDER, SKILL_CONFIG } = require('../shared/radarChart.js');
+const { getSkillLevel, LEVEL_COLORS } = require('../models/skill.js');
 
 class StatsScene extends Scene {
   constructor(game) {
@@ -132,7 +133,7 @@ class StatsScene extends Scene {
     drawSkillCard(ctx, width * 0.05, cardY, width * 0.9, cardHeight, skills, {
       playerColor: '#9bbc0f',
       showLabels: true,
-      showValues: true,
+      showValues: false,
       maxScore: 100,
       selectedSkill: this.selectedSkill
     });
@@ -143,6 +144,18 @@ class StatsScene extends Scene {
     const startY = height * 0.66;
     
     // 综合能力
+    let overall = 0;
+    let overallLevel = { level: 0, name: '新手' };
+    try {
+      const overallRaw = player.calculateOverall();
+      overall = (typeof overallRaw === 'number' && !isNaN(overallRaw)) ? overallRaw : 0;
+      if (overall > 0) {
+        overallLevel = getSkillLevel(overall) || { level: 0, name: '新手' };
+      }
+    } catch (e) {
+      console.error('Error calculating overall in stats:', e);
+    }
+    
     ctx.fillStyle = CONFIG.THEME.TEXT_MAIN;
     ctx.font = `bold ${width * 0.038}px sans-serif`;
     ctx.textAlign = 'left';
@@ -150,7 +163,12 @@ class StatsScene extends Scene {
     
     ctx.fillStyle = CONFIG.THEME.PRIMARY;
     ctx.font = `bold ${width * 0.042}px sans-serif`;
-    ctx.fillText(`${player.calculateOverall()}/100`, width * 0.3, startY);
+    ctx.fillText(`${overall}`, width * 0.3, startY);
+    
+    // 显示等级名称
+    ctx.fillStyle = LEVEL_COLORS[overallLevel.level] || CONFIG.THEME.PRIMARY;
+    ctx.font = `${width * 0.032}px sans-serif`;
+    ctx.fillText(`(${overallLevel.name})`, width * 0.42, startY);
     
     // 技能点
     ctx.fillStyle = CONFIG.THEME.TEXT_MAIN;

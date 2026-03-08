@@ -8,6 +8,7 @@ const { RandomEvents } = require('../models/events.js');
 const Sponsor = require('../models/sponsor.js');
 const Equipment = require('../models/equipment.js');
 const { CoachPayroll } = require('../models/coach.js');
+const { getSkillLevel, LEVEL_COLORS } = require('../models/skill.js');
 
 // 像素风格颜色配置
 const PIXEL_THEME = {
@@ -439,10 +440,29 @@ class HomeScene extends Scene {
     ctx.fillText(player.name, nameX, height * 0.045 + offsetY);
 
     // 年龄和综合实力
+    let overall = 0;
+    let overallLevel = { level: 0, name: '新手' };
+    try {
+      const overallRaw = player.calculateOverall();
+      overall = (typeof overallRaw === 'number' && !isNaN(overallRaw)) ? overallRaw : 0;
+      if (overall > 0) {
+        overallLevel = getSkillLevel(overall) || { level: 0, name: '新手' };
+      }
+    } catch (e) {
+      console.error('Error calculating overall:', e);
+    }
+    
     ctx.fillStyle = PIXEL_THEME.PRIMARY;
     ctx.font = `${width * 0.024}px sans-serif`;
     ctx.fillText(`年龄 ${player.age}岁`, nameX, height * 0.075 + offsetY);
-    ctx.fillText(`综合 ${player.calculateOverall()}`, nameX, height * 0.10 + offsetY);
+    
+    // 综合实力显示（带等级）
+    ctx.fillText(`综合 ${overall}`, nameX, height * 0.10 + offsetY);
+    
+    // 显示等级名称和颜色
+    ctx.fillStyle = LEVEL_COLORS[overallLevel.level] || PIXEL_THEME.PRIMARY;
+    ctx.font = `${width * 0.02}px sans-serif`;
+    ctx.fillText(`(${overallLevel.name})`, nameX + width * 0.12, height * 0.10 + offsetY);
 
     // ===== 右侧：世界排名和训练点数 =====
     const rightX = width * 0.88;

@@ -148,7 +148,13 @@ class Skill {
 
   // 设置伤病惩罚
   setInjuryPenalty(penalty) {
-    this.injuryPenalty = Math.max(0, penalty);
+    // 如果penalty是数字，直接使用
+    if (typeof penalty === 'number' && !isNaN(penalty)) {
+      this.injuryPenalty = Math.max(0, penalty);
+    } else {
+      // 如果penalty是对象（技能类型对应的惩罚值），设置为0
+      this.injuryPenalty = 0;
+    }
   }
 
   // 序列化
@@ -293,12 +299,41 @@ class SkillManager {
   }
 
   // 计算综合能力
+  // 规则：若能力均衡(等级相同)，则为各项能力加总，落在该等级区间内
+  // 若能力不均衡，则加权平均，偏离平均等级越远权重越大，综合更接近短板
   calculateOverall() {
-    let total = 0;
-    for (const skill of Object.values(this.skills)) {
-      total += skill.getFinalScore();
+    const skills = Object.values(this.skills);
+    const skillCount = skills.length;
+    
+    // 1. 计算各技能的有效值 = 分数 + 等级×100
+    const effectiveValues = skills.map(skill => {
+      const score = skill.getFinalScore();
+      const level = skill.getLevel().level;
+      return {
+        score: score,
+        level: level,
+        effectiveValue: score + level * 100
+      };
+    });
+    
+    // 2. 计算平均等级
+    const avgLevel = effectiveValues.reduce((sum, v) => sum + v.level, 0) / skillCount;
+    
+    // 3. 计算权重：偏离平均等级越远权重越大（短板效应）
+    // 权重 = 1 + |等级 - 平均等级| × 0.5
+    // 这样等级低（短板）的权重会更大，拉低综合分数
+    let totalWeight = 0;
+    let weightedSum = 0;
+    for (const v of effectiveValues) {
+      const weight = 1 + Math.abs(v.level - avgLevel) * 0.5;
+      totalWeight += weight;
+      weightedSum += v.effectiveValue * weight;
     }
-    return Math.floor(total / 7);
+    
+    // 4. 计算综合能力（加权平均）
+    const overall = weightedSum / totalWeight;
+    
+    return Math.floor(overall);
   }
 
   // 序列化
