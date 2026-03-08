@@ -61,7 +61,7 @@ class HomeScene extends Scene {
     // 第一行：训练 | 比赛
     this.addButton(width * 0.04, startY, btnWidth, btnHeight, '🏋️ 训练', () => {
       if (!this.game.canDoTrainingOrRest()) {
-        this.game.showToast('本周训练/休息次数已用完！');
+        this.game.showToast('训练点数不足！');
         return;
       }
       this.game.changeScene(GAME_STATE.TRAINING);
@@ -79,18 +79,6 @@ class HomeScene extends Scene {
       this.game.changeScene(GAME_STATE.MATCH);
     }, {
       bgColor: PIXEL_THEME.BUTTON_MATCH,
-      textColor: '#ffffff',
-      fontSize: width * 0.035
-    });
-
-    this.addButton(width * 0.72, startY, btnWidth, btnHeight, '😴 休息', () => {
-      if (!this.game.canDoTrainingOrRest()) {
-        this.game.showToast('本周训练/休息次数已用完！');
-        return;
-      }
-      this.game.changeScene(GAME_STATE.REST);
-    }, {
-      bgColor: PIXEL_THEME.BUTTON_REST,
       textColor: '#ffffff',
       fontSize: width * 0.035
     });
@@ -420,9 +408,6 @@ class HomeScene extends Scene {
   drawTopStatusBar(ctx, player) {
     const { width, height } = this.getCanvasSize();
 
-    // 获取剩余次数
-    const remaining = this.game.getRemainingActions();
-
     // 状态栏高度
     const barHeight = height * 0.22;
     const offsetY = 50; // 往下移动50px
@@ -434,13 +419,6 @@ class HomeScene extends Scene {
     // 顶部装饰线
     ctx.fillStyle = PIXEL_THEME.PRIMARY;
     ctx.fillRect(0, 0, width, 3);
-    
-    // 显示本周剩余次数
-    ctx.fillStyle = '#ffd700';
-    ctx.font = `${width * 0.022}px sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.fillText(`训练/休息: ${remaining.trainingRest}/${this.game.WEEKLY_LIMITS.MAX_TRAINING_REST}`, width * 0.96, height * 0.04 + offsetY);
-    ctx.fillText(`比赛: ${remaining.match}/${this.game.WEEKLY_LIMITS.MAX_MATCH}`, width * 0.96, height * 0.065 + offsetY);
 
     // ===== 左侧：角色形象 + 玩家信息 =====
     const avatarSize = width * 0.12;
@@ -466,38 +444,7 @@ class HomeScene extends Scene {
     ctx.fillText(`年龄 ${player.age}岁`, nameX, height * 0.075 + offsetY);
     ctx.fillText(`综合 ${player.calculateOverall()}`, nameX, height * 0.10 + offsetY);
 
-    // ===== 中间：五维属性（两行显示：第一行速度/力量/技术，第二行耐力/心力） =====
-    const centerX = width * 0.50;
-    const row1Attrs = [
-      { name: '速度', value: player.speed, color: '#3b82f6' },
-      { name: '力量', value: player.strength, color: '#ef4444' },
-      { name: '技术', value: player.technique, color: '#10b981' }
-    ];
-    const row2Attrs = [
-      { name: '耐力', value: player.endurance, color: '#f97316' },
-      { name: '心力', value: player.mentality, color: '#a855f7' }
-    ];
-
-    const row1Spacing = (width * 0.40) / 3;
-    const row2Spacing = (width * 0.25) / 2;
-    ctx.font = `${width * 0.028}px sans-serif`;
-    ctx.textAlign = 'center';
-
-    // 第一行
-    for (let i = 0; i < row1Attrs.length; i++) {
-      const x = centerX + (i - 1) * row1Spacing;
-      ctx.fillStyle = row1Attrs[i].color;
-      ctx.fillText(`${row1Attrs[i].name}: ${row1Attrs[i].value}`, x, height * 0.055 + offsetY);
-    }
-
-    // 第二行
-    for (let i = 0; i < row2Attrs.length; i++) {
-      const x = centerX + (i - 0.5) * row2Spacing;
-      ctx.fillStyle = row2Attrs[i].color;
-      ctx.fillText(`${row2Attrs[i].name}: ${row2Attrs[i].value}`, x, height * 0.09 + offsetY);
-    }
-
-    // ===== 右侧：世界排名 =====
+    // ===== 右侧：世界排名和训练点数 =====
     const rightX = width * 0.88;
 
     // 世界排名
@@ -510,10 +457,16 @@ class HomeScene extends Scene {
     ctx.font = `bold ${width * 0.045}px sans-serif`;
     ctx.fillText(player.ranking <= 999 ? `#${player.ranking}` : '无', rightX, height * 0.085 + offsetY);
 
+    // 训练点数显示（高亮显示）
+    const tpColor = player.trainingPoints > 0 ? CONFIG.THEME.GREEN : CONFIG.THEME.RED;
+    ctx.fillStyle = tpColor;
+    ctx.font = `bold ${width * 0.032}px sans-serif`;
+    ctx.fillText(`🎯 训练点: ${player.trainingPoints}/5`, rightX, height * 0.13 + offsetY);
+
     // 资金显示
     ctx.fillStyle = CONFIG.THEME.GOLD;
     ctx.font = `${width * 0.028}px sans-serif`;
-    ctx.fillText(`💰 $${player.money}`, rightX, height * 0.12 + offsetY);
+    ctx.fillText(`💰 $${player.money}`, rightX, height * 0.17 + offsetY);
     
     // 显示伤病状态
     if (player.injury && player.injury.isInjured) {
@@ -528,8 +481,8 @@ class HomeScene extends Scene {
       const injuryName = injuryNames[player.injury.type] || '伤病';
       ctx.fillStyle = CONFIG.THEME.RED;
       ctx.font = `${width * 0.026}px sans-serif`;
-      ctx.fillText(`🤕 ${injuryName}`, rightX, height * 0.16 + offsetY);
-      ctx.fillText(`恢复${player.injury.weeksRemaining}周`, rightX, height * 0.19 + offsetY);
+      ctx.fillText(`🤕 ${injuryName}`, rightX, height * 0.21 + offsetY);
+      ctx.fillText(`恢复${player.injury.weeksRemaining}周`, rightX, height * 0.24 + offsetY);
     }
   }
 

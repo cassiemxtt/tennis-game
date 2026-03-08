@@ -341,7 +341,7 @@ class Game {
         matchCount: 0
       };
     }
-    return this.gameData.weeklyActions.trainingRestCount < this.WEEKLY_LIMITS.MAX_TRAINING_REST;
+    return this.player.trainingPoints > 0;
   }
 
   // 检查比赛次数限制
@@ -392,7 +392,11 @@ class Game {
   }
 
   // 重置每周操作次数（进入新一周时调用）
-  resetWeeklyActions() {
+resetWeeklyActions() {
+    // 重置玩家训练点数
+    if (this.player) {
+      this.player.resetTrainingPoints();
+    }
     // 兼容处理：确保 weeklyActions 存在
     if (!this.gameData.weeklyActions) {
       this.gameData.weeklyActions = {

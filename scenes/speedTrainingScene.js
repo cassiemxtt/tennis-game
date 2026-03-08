@@ -47,7 +47,7 @@ class SpeedTrainingScene extends Scene {
 
   enter() {
     const player = this.game.player;
-    const trainingId = '2'; // 速度训练
+    const trainingId = 'speed'; // 速度训练
 
     // 检查资源
     const training = Training.TRAINING_TYPES[trainingId];

@@ -1,6 +1,10 @@
 /**
  * 数据模型 - Player 球员类
+ * 使用新的技能系统：7种技能 + 技能点
  */
+const { SkillManager, SKILL_TYPES, SKILL_INFO } = require('./skill.js');
+const { Coach, COACH_LEVELS } = require('./coach.js');
+
 class Player {
   constructor(name = '网球新星', gender = 'male') {
     this.name = name;
@@ -8,7 +12,7 @@ class Player {
     this.age = 14;
     this.careerYear = 0;
     this.energy = 100;
-    this.money = 1000;
+    this.money = 1000000000;
     this.ranking = 1000;
     this.careerEarnings = 0;
     this.titles = 0;
@@ -16,20 +20,8 @@ class Player {
     this.matchesPlayed = 0;
     this.matchesWon = 0;
 
-    // 核心属性 (1-100)
-    this.strength = 30;
-    this.speed = 40;
-    this.technique = 35;
-    this.endurance = 35;
-    this.mentality = 30;
-    this.form = 80;
-
-    // 技能专长
-    this.serve = 30;
-    this.forehand = 35;
-    this.backhand = 30;
-    this.volley = 25;
-    this.returnGame = 30;
+    // 状态
+    this.form = 80;  // 状态 0-100
 
     // 疲劳度
     this.fatigue = 0;
@@ -37,6 +29,10 @@ class Player {
     // 生涯记录
     this.careerHighRanking = 1000;
     this.bestResult = '无';
+
+    // 技能系统
+    this.skillManager = new SkillManager();
+    this.skillPoints = 0;  // 可用技能点
 
     // 当前赞助商 - 存储对象 {name, expiresYear, expiresMonth, expired}
     this.sponsors = [];
@@ -62,6 +58,34 @@ class Player {
     
     // 教练团队
     this.coaches = [];
+    
+    // 训练点数系统
+    this.trainingPoints = 5;  // 每周5点训练点数
+    
+    // 带练教练 - 当前选择陪同训练的教练
+    this.trainingCoach = null;  // 存储教练type
+    
+    // 瓶颈期状态 - 记录每项技能的连续训练次数
+    this.plateauCount = {
+      baseline: 0,
+      volley: 0,
+      serve: 0,
+      dropShot: 0,
+      slice: 0,
+      lob: 0,
+      smash: 0
+    };
+    
+    // 技能是否处于瓶颈期
+    this.inPlateau = {
+      baseline: false,
+      volley: false,
+      serve: false,
+      dropShot: false,
+      slice: false,
+      lob: false,
+      smash: false
+    };
   }
   
   // 检查是否有伤病影响
@@ -71,20 +95,22 @@ class Player {
     }
     
     const baseEffect = {
-      strength: 0,
-      speed: 0,
-      technique: 0,
-      endurance: 0,
-      mentality: 0
+      baseline: 0,
+      volley: 0,
+      serve: 0,
+      dropShot: 0,
+      slice: 0,
+      lob: 0,
+      smash: 0
     };
     
     const injuryEffects = {
-      'light_strain': { speed: -10 },
-      'muscle_soreness': { strength: -10 },
-      'sprain': { speed: -15 },
-      'tennis_elbow': { technique: -20 },
-      'meniscus': { strength: -15, speed: -15, technique: -10 },
-      'season_end': { strength: -20, speed: -20, technique: -20, endurance: -20, mentality: -20 }
+      'light_strain': { baseline: -10 },
+      'muscle_soreness': { baseline: -10 },
+      'sprain': { volley: -15 },
+      'tennis_elbow': { serve: -20, smash: -15 },
+      'meniscus': { baseline: -15, volley: -15, serve: -10 },
+      'season_end': { baseline: -20, volley: -20, serve: -20, dropShot: -20, slice: -20, lob: -20, smash: -20 }
     };
     
     const effect = injuryEffects[this.injury.type] || {};
@@ -93,23 +119,23 @@ class Player {
   
   // 计算综合实力（考虑伤病影响）
   calculateOverall() {
-    const baseStats = Math.floor((this.strength + this.speed + this.technique + this.endurance + this.mentality) / 5);
-    const skills = Math.floor((this.serve + this.forehand + this.backhand + this.volley + this.returnGame) / 5);
-    let overall = Math.floor((baseStats * 6 + skills * 4) / 10);
-    overall -= Math.floor(this.fatigue / 10);
-    
-    // 伤病减益
-    if (this.injury.isInjured) {
-      const effect = this.getInjuryEffect();
-      if (effect) {
-        const penalty = Math.abs(effect.strength || 0) + Math.abs(effect.speed || 0) + 
-                       Math.abs(effect.technique || 0) + Math.abs(effect.endurance || 0) + 
-                       Math.abs(effect.mentality || 0);
-        overall -= Math.floor(penalty / 2);
-      }
-    }
-    
-    return Math.max(1, Math.min(100, overall));
+    // 使用技能管理器的综合计算
+    return this.skillManager.calculateOverall();
+  }
+  
+  // 获取技能管理器
+  getSkills() {
+    return this.skillManager;
+  }
+  
+  // 获取所有技能（快捷方法）
+  getAllSkills() {
+    return this.skillManager.getAllSkills();
+  }
+  
+  // 获取指定技能
+  getSkill(type) {
+    return this.skillManager.getSkill(type);
   }
   
   // 获得伤病
@@ -119,6 +145,8 @@ class Player {
       weeksRemaining: duration,
       isInjured: true
     };
+    // 更新伤病惩罚
+    this.updateSkillBonuses();
   }
   
   // 伤病恢复一周
@@ -131,10 +159,73 @@ class Player {
           weeksRemaining: 0,
           isInjured: false
         };
+        this.updateSkillBonuses();
         return true; // 伤病痊愈
       }
     }
     return false;
+  }
+  
+  // 更新技能加成（赞助、装备、教练、状态、伤病）
+  updateSkillBonuses() {
+    // 计算赞助加成系数
+    let sponsorMultiplier = 1.0;
+    for (const sponsor of this.sponsors) {
+      if (!sponsor.expired) {
+        sponsorMultiplier = Math.max(sponsorMultiplier, sponsor.multiplier || 1.0);
+      }
+    }
+    
+    // 计算装备加成系数
+    let equipmentMultiplier = 1.0;
+    // 装备加成稍后从装备系统获取
+    
+    // 计算教练加成（使用Coach类）
+    let coachBonus = {};
+    for (const coachData of this.coaches) {
+      const coach = new Coach(coachData);
+      const skillBonus = coach.getSkillBonus();
+      for (const [skill, bonus] of Object.entries(skillBonus)) {
+        coachBonus[skill] = (coachBonus[skill] || 0) + bonus;
+      }
+    }
+    
+    // 计算年龄加成
+    let ageBonus = 0;
+    if (this.age >= 18 && this.age <= 25) {
+      ageBonus = 5; // 黄金年龄
+    } else if (this.age > 30) {
+      ageBonus = -5; // 年龄增长
+    }
+    
+    // 计算伤病惩罚
+    let injuryPenalty = {};
+    if (this.injury.isInjured) {
+      const effect = this.getInjuryEffect();
+      if (effect) {
+        injuryPenalty = effect;
+      }
+    }
+    
+    // 更新所有技能加成
+    this.skillManager.updateBonuses({
+      sponsorBonus: {
+        baseline: Math.floor(10 * (sponsorMultiplier - 1)),
+        volley: Math.floor(10 * (sponsorMultiplier - 1)),
+        serve: Math.floor(10 * (sponsorMultiplier - 1)),
+        dropShot: Math.floor(10 * (sponsorMultiplier - 1)),
+        slice: Math.floor(10 * (sponsorMultiplier - 1)),
+        lob: Math.floor(10 * (sponsorMultiplier - 1)),
+        smash: Math.floor(10 * (sponsorMultiplier - 1))
+      },
+      equipmentBonus: {
+        baseline: 0, volley: 0, serve: 0, dropShot: 0, slice: 0, lob: 0, smash: 0
+      },
+      coachBonus: coachBonus,
+      ageBonus: ageBonus,
+      form: this.form,
+      injuryPenalty: injuryPenalty
+    });
   }
   
   // 雇佣教练
@@ -156,6 +247,9 @@ class Player {
       contractMonths: coach.contractMonths || 12
     });
     
+    // 更新技能加成
+    this.updateSkillBonuses();
+    
     return { success: true, message: `已雇佣${coach.name}` };
   }
   
@@ -167,28 +261,98 @@ class Player {
     }
     
     this.coaches.splice(index, 1);
+    
+    // 更新技能加成
+    this.updateSkillBonuses();
+    
     return { success: true, message: '教练已解雇' };
   }
   
-  // 获取教练加成
+  // 获取教练加成（使用等级系统）
   getCoachBonus() {
     const bonus = {
       trainingEffect: 0,
       injuryResistance: 0,
       matchWinRate: 0,
       energyRecovery: 0,
-      sponsorIncome: 0
+      sponsorIncome: 0,
+      plateauBreak: 0,  // 突破瓶颈的能力
+      serveEffect: 0,
+      volleyEffect: 0,
+      baselineEffect: 0,
+      sliceEffect: 0
     };
     
-    for (const coach of this.coaches) {
-      if (coach.type === 'technique') bonus.trainingEffect += 0.15;
-      else if (coach.type === 'fitness') bonus.energyRecovery += 0.15;
-      else if (coach.type === 'mental') bonus.matchWinRate += 5;
-      else if (coach.type === 'physio') bonus.injuryResistance += 0.2;
-      else if (coach.type === 'agent') bonus.sponsorIncome += 0.15;
+    for (const coachData of this.coaches) {
+      // 使用Coach类计算加成
+      const coach = new Coach(coachData);
+      const effect = coach.getEffectValue();
+      
+      for (const [key, value] of Object.entries(effect)) {
+        if (bonus.hasOwnProperty(key)) {
+          bonus[key] += value;
+        }
+      }
     }
     
     return bonus;
+  }
+  
+  // 获取赞助商突破加成
+  getSponsorBreakBonus() {
+    let breakBonus = 0;
+    for (const sponsor of this.sponsors) {
+      if (!sponsor.expired && sponsor.level) {
+        breakBonus += sponsor.level * 0.1;  // 等级越高突破加成越高
+      }
+    }
+    return breakBonus;
+  }
+  
+  // 检查是否可以突破瓶颈
+  canBreakPlateau(skillType) {
+    const coachBonus = this.getCoachBonus();
+    const sponsorBonus = this.getSponsorBreakBonus();
+    return (coachBonus.plateauBreak + sponsorBonus) > 0;
+  }
+  
+  // 突破瓶颈
+  breakPlateau(skillType) {
+    if (this.canBreakPlateau(skillType)) {
+      this.plateauCount[skillType] = 0;
+      this.inPlateau[skillType] = false;
+      return true;
+    }
+    return false;
+  }
+  
+  // 获取年龄训练加成
+  getAgeTrainingBonus() {
+    if (this.age < 18) return 1.5;
+    if (this.age <= 25) return 1.0;
+    if (this.age <= 30) return 0.7;
+    return 0.3;
+  }
+  
+  // 获取状态训练加成
+  getFormTrainingBonus() {
+    if (this.form >= 80) return 1.15;
+    if (this.form >= 50) return 1.0;
+    return 0.7;
+  }
+  
+  // 重置训练点数（每周调用）
+  resetTrainingPoints() {
+    this.trainingPoints = 5;
+  }
+  
+  // 使用训练点数
+  useTrainingPoints(count = 1) {
+    if (this.trainingPoints >= count) {
+      this.trainingPoints -= count;
+      return true;
+    }
+    return false;
   }
 
   getFormAdjustment() {
@@ -203,18 +367,8 @@ class Player {
     this.age += 1;
     this.careerYear += 1;
 
-    if (this.age < 22) {
-      const growth = this.randomInt(1, 3);
-      for (let i = 0; i < growth; i++) {
-        const attr = this.randomChoice(['strength', 'speed', 'endurance']);
-        if (this[attr] < 90) this[attr]++;
-      }
-    } else if (this.age > 30) {
-      if (Math.random() < 0.3) {
-        const attr = this.randomChoice(['speed', 'endurance']);
-        if (this[attr] > 20) this[attr]--;
-      }
-    }
+    // 年龄变化时更新加成
+    this.updateSkillBonuses();
   }
 
   addFatigue(amount) {
@@ -232,6 +386,8 @@ class Player {
     if (Math.random() > 0.5) {
       this.form = Math.min(100, this.form + this.randomInt(5, 15));
     }
+    // 更新状态加成
+    this.updateSkillBonuses();
     return recovery;
   }
 
@@ -276,34 +432,51 @@ class Player {
       grandSlams: this.grandSlams,
       matchesPlayed: this.matchesPlayed,
       matchesWon: this.matchesWon,
-      strength: this.strength,
-      speed: this.speed,
-      technique: this.technique,
-      endurance: this.endurance,
-      mentality: this.mentality,
       form: this.form,
-      serve: this.serve,
-      forehand: this.forehand,
-      backhand: this.backhand,
-      volley: this.volley,
-      returnGame: this.returnGame,
       fatigue: this.fatigue,
       careerHighRanking: this.careerHighRanking,
       bestResult: this.bestResult,
+      skillManager: this.skillManager.toJSON(),
+      skillPoints: this.skillPoints,
       sponsors: this.sponsors,
       equipment: this.equipment,
       injury: this.injury,
-      coaches: this.coaches
+      coaches: this.coaches,
+      trainingPoints: this.trainingPoints,
+      trainingCoach: this.trainingCoach,
+      plateauCount: this.plateauCount,
+      inPlateau: this.inPlateau
     };
   }
 
   static fromJSON(data) {
     const player = new Player(data.name || '网球新星', data.gender || 'male');
     Object.assign(player, data);
+    
+    // 恢复技能系统
+    if (data.skillManager) {
+      player.skillManager = SkillManager.fromJSON(data.skillManager);
+    }
+    player.skillPoints = data.skillPoints || 0;
+    
     // 确保 gender 字段有值
     if (!player.gender) {
       player.gender = 'male';
     }
+    
+    // 恢复训练点数系统
+    player.trainingPoints = data.trainingPoints || 5;
+    player.trainingCoach = data.trainingCoach || null;
+    player.plateauCount = data.plateauCount || {
+      baseline: 0, volley: 0, serve: 0, dropShot: 0, slice: 0, lob: 0, smash: 0
+    };
+    player.inPlateau = data.inPlateau || {
+      baseline: false, volley: false, serve: false, dropShot: false, slice: false, lob: false, smash: false
+    };
+    
+    // 更新技能加成
+    player.updateSkillBonuses();
+    
     return player;
   }
 }

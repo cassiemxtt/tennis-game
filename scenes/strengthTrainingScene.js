@@ -47,7 +47,7 @@ class StrengthTrainingScene extends Scene {
 
   enter() {
     const player = this.game.player;
-    const trainingId = '1'; // 力量训练
+    const trainingId = 'strength'; // 力量训练
 
     // 检查资源
     const training = Training.TRAINING_TYPES[trainingId];

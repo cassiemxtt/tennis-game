@@ -55,7 +55,7 @@ class TechTrainingScene extends Scene {
 
   enter() {
     const player = this.game.player;
-    const trainingId = '3'; // 技术训练
+    const trainingId = 'technique'; // 技术训练
 
     // 检查资源
     const training = Training.TRAINING_TYPES[trainingId];

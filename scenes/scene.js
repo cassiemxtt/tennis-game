@@ -46,6 +46,14 @@ class Scene {
     this.keyboard = null;
     this._canvasWidth = 375;
     this._canvasHeight = 667;
+    
+    // 触摸跟踪 - 用于区分滑动和点击
+    this.touchStartX = 0;
+    this.touchStartY = 0;
+    this.touchStartTime = 0;
+    this.touchMoved = false;
+    this.scrollThreshold = 10;  // 移动超过10像素认为是滑动
+    this.tapTimeout = 200;     // 按下超过200毫秒才认为是滑动
   }
 
   // 获取 Canvas 尺寸（统一方法）
@@ -86,6 +94,11 @@ class Scene {
         button.pressed = false;
       }
     }
+  }
+
+  // 清除所有按钮
+  clearButtons() {
+    this.buttons = [];
   }
 
   // 统一的添加按钮方法

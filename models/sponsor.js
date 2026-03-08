@@ -1,6 +1,7 @@
 /**
  * 数据模型 - Sponsor 赞助系统
  * 支持服装赞助商和球拍赞助商
+ * 添加技能系数加成
  */
 class Sponsor {
   // 赞助类型
@@ -19,6 +20,7 @@ class Sponsor {
       monthlyPayment: 100,
       signingBonus: 500,
       duration: 24,
+      multiplier: 1.0,  // 能力系数
       unlocks: {
         body: ['default_white'],
         shoes: ['default_white'],
@@ -33,6 +35,8 @@ class Sponsor {
       monthlyPayment: 300,
       signingBonus: 1500,
       duration: 24,
+      multiplier: 1.05,  // +5% 能力加成
+      skillBonus: { serve: 5, baseline: 3 },  // 技能额外加成
       unlocks: {
         body: ['default_white', 'nike_blue', 'nike_red', 'adidas_white', 'adidas_black'],
         shoes: ['default_white', 'nike_zoom', 'nike_air', 'adidas_white', 'asics_white', 'asics_blue', 'mizuno_white'],
@@ -47,6 +51,8 @@ class Sponsor {
       monthlyPayment: 800,
       signingBonus: 5000,
       duration: 24,
+      multiplier: 1.1,  // +10% 能力加成
+      skillBonus: { serve: 10, baseline: 8, volley: 5 },
       unlocks: {
         body: ['default_white', 'nike_blue', 'nike_red', 'adidas_white', 'adidas_black', 'nike_orange', 'prince_yellow', 'k_swiss_white'],
         shoes: ['default_white', 'nike_zoom', 'nike_air', 'adidas_white', 'asics_white', 'asics_blue', 'mizuno_white', 'mizuno_black'],
@@ -61,6 +67,8 @@ class Sponsor {
       monthlyPayment: 2000,
       signingBonus: 20000,
       duration: 24,
+      multiplier: 1.15,  // +15% 能力加成
+      skillBonus: { serve: 15, baseline: 12, volley: 10, smash: 8 },
       unlocks: {
         body: ['default_white', 'nike_blue', 'nike_red', 'adidas_white', 'adidas_black', 'nike_orange', 'prince_yellow', 'k_swiss_white'],
         shoes: ['default_white', 'nike_zoom', 'nike_air', 'adidas_white', 'asics_white', 'asics_blue', 'mizuno_white', 'mizuno_black'],
@@ -75,6 +83,8 @@ class Sponsor {
       monthlyPayment: 5000,
       signingBonus: 50000,
       duration: 24,
+      multiplier: 1.2,  // +20% 能力加成
+      skillBonus: { serve: 20, baseline: 18, volley: 15, smash: 12, dropShot: 10 },
       unlocks: {
         body: ['default_white', 'nike_blue', 'nike_red', 'adidas_white', 'adidas_black', 'nike_orange', 'prince_yellow', 'k_swiss_white'],
         shoes: ['default_white', 'nike_zoom', 'nike_air', 'adidas_white', 'asics_white', 'asics_blue', 'mizuno_white', 'mizuno_black'],
@@ -91,6 +101,7 @@ class Sponsor {
       monthlyPayment: 80,
       signingBonus: 400,
       duration: 24,
+      multiplier: 1.0,
       unlocks: {
         racket: ['default']
       }
@@ -102,6 +113,8 @@ class Sponsor {
       monthlyPayment: 250,
       signingBonus: 1200,
       duration: 24,
+      multiplier: 1.05,
+      skillBonus: { serve: 8, baseline: 5 },
       unlocks: {
         racket: ['default', 'pro_black', 'pro_white']
       }
@@ -113,6 +126,8 @@ class Sponsor {
       monthlyPayment: 600,
       signingBonus: 4000,
       duration: 24,
+      multiplier: 1.1,
+      skillBonus: { serve: 15, baseline: 10, volley: 8 },
       unlocks: {
         racket: ['default', 'pro_black', 'pro_white', 'nike_vapor', 'head_graphene', 'wilson_red']
       }
@@ -124,6 +139,8 @@ class Sponsor {
       monthlyPayment: 1500,
       signingBonus: 15000,
       duration: 24,
+      multiplier: 1.15,
+      skillBonus: { serve: 20, baseline: 15, volley: 12, smash: 10 },
       unlocks: {
         racket: ['default', 'pro_black', 'pro_white', 'nike_vapor', 'head_graphene', 'wilson_red', 'babolat_blue']
       }
@@ -135,6 +152,8 @@ class Sponsor {
       monthlyPayment: 4000,
       signingBonus: 40000,
       duration: 24,
+      multiplier: 1.2,
+      skillBonus: { serve: 25, baseline: 20, volley: 18, smash: 15, dropShot: 12 },
       unlocks: {
         racket: ['default', 'pro_black', 'pro_white', 'limited_gold', 'nike_vapor', 'head_graphene', 'wilson_red', 'babolat_blue']
       }
@@ -174,7 +193,9 @@ class Sponsor {
           name: info.name,
           monthlyPayment: info.monthlyPayment,
           signingBonus: info.signingBonus,
-          duration: info.duration
+          duration: info.duration,
+          multiplier: info.multiplier,
+          skillBonus: info.skillBonus
         });
       }
     }
@@ -221,10 +242,17 @@ class Sponsor {
       name: sponsor.name,
       expiresYear: expireYear,
       expiresMonth: expireMonth,
-      expired: false
+      expired: false,
+      multiplier: sponsor.multiplier,
+      skillBonus: sponsor.skillBonus
     });
 
     player.money += sponsor.signingBonus;
+
+    // 更新玩家技能加成
+    if (player.updateSkillBonuses) {
+      player.updateSkillBonuses();
+    }
 
     return {
       success: true,
@@ -232,7 +260,8 @@ class Sponsor {
       signingBonus: sponsor.signingBonus,
       monthlyPayment: sponsor.monthlyPayment,
       expiresYear: expireYear,
-      expiresMonth: expireMonth
+      expiresMonth: expireMonth,
+      multiplier: sponsor.multiplier
     };
   }
 
@@ -387,10 +416,39 @@ class Sponsor {
       }
     }
 
+    // 更新玩家技能加成
+    if (player.updateSkillBonuses) {
+      player.updateSkillBonuses();
+    }
+
     return {
       expired: expiredSponsors,
       recovered: recovered
     };
+  }
+
+  // 获取最高赞助系数
+  static getHighestMultiplier(player) {
+    let multiplier = 1.0;
+    for (const sponsor of player.sponsors) {
+      if (!sponsor.expired && sponsor.multiplier) {
+        multiplier = Math.max(multiplier, sponsor.multiplier);
+      }
+    }
+    return multiplier;
+  }
+
+  // 获取赞助技能加成总计
+  static getTotalSkillBonus(player) {
+    const totalBonus = {};
+    for (const sponsor of player.sponsors) {
+      if (!sponsor.expired && sponsor.skillBonus) {
+        for (const [skill, bonus] of Object.entries(sponsor.skillBonus)) {
+          totalBonus[skill] = (totalBonus[skill] || 0) + bonus;
+        }
+      }
+    }
+    return totalBonus;
   }
 }
 
