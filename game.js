@@ -40,7 +40,8 @@ const GAME_STATE = {
   STATS: 'stats',
   REST: 'rest',
   EVENT: 'event',
-  COACH: 'coach'
+  COACH: 'coach',
+  ITEM: 'item'
 };
 
 // 游戏主类
@@ -188,7 +189,8 @@ class Game {
       stats: new StatsScene(this),
       rest: new RestScene(this),
       event: new EventScene(this),
-      coach: new CoachScene(this)
+      coach: new CoachScene(this),
+      item: new ItemScene(this)
     };
   }
 
@@ -501,6 +503,7 @@ const StatsScene = require('./scenes/statsScene.js');
 const RestScene = require('./scenes/restScene.js');
 const EventScene = require('./scenes/eventScene.js');
 const CoachScene = require('./scenes/coachScene.js');
+const ItemScene = require('./scenes/itemScene.js');
 
 // 创建并启动游戏实例（关键：确保游戏运行）
 const game = new Game();

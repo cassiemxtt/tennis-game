@@ -34,7 +34,8 @@ const GAME_STATE = {
   STATS: 'stats',
   REST: 'rest',
   EVENT: 'event',
-  COACH: 'coach'
+  COACH: 'coach',
+  ITEM: 'item'  // 道具系统
 };
 
 class Scene {

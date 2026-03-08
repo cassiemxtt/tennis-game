@@ -49,6 +49,13 @@ class StrengthTrainingScene extends Scene {
     const player = this.game.player;
     const trainingId = 'strength'; // 力量训练
 
+    // 检查训练点数
+    if (player.trainingPoints <= 0) {
+      this.game.showToast('训练点数不足！');
+      this.game.changeScene(GAME_STATE.TRAINING);
+      return;
+    }
+
     // 检查资源
     const training = Training.TRAINING_TYPES[trainingId];
     this.currentTraining = training;
@@ -62,6 +69,10 @@ class StrengthTrainingScene extends Scene {
     // 扣除资源
     player.money -= training.cost;
     player.energy -= training.energy;
+    
+    // 扣除训练点数
+    player.useTrainingPoints(1);
+    this.game.addTrainingRestAction();
 
     // 初始化哑铃位置
     this.initDumbbell();

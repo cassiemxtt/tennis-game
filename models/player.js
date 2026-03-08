@@ -1,9 +1,11 @@
 /**
  * 数据模型 - Player 球员类
- * 使用新的技能系统：7种技能 + 技能点
+ * 使用新的技能系统：7种技能 + 技能点 + 策略系统 + 道具系统
  */
 const { SkillManager, SKILL_TYPES, SKILL_INFO } = require('./skill.js');
 const { Coach, COACH_LEVELS } = require('./coach.js');
+const { StrategyManager, STRATEGY_TYPES } = require('./strategy.js');
+const { InventoryManager, ITEM_TYPES } = require('./item.js');
 
 class Player {
   constructor(name = '网球新星', gender = 'male') {
@@ -33,6 +35,12 @@ class Player {
     // 技能系统
     this.skillManager = new SkillManager();
     this.skillPoints = 0;  // 可用技能点
+
+    // 策略系统
+    this.strategyManager = new StrategyManager();
+    
+    // 背包系统
+    this.inventory = new InventoryManager();
 
     // 当前赞助商 - 存储对象 {name, expiresYear, expiresMonth, expired}
     this.sponsors = [];
@@ -445,6 +453,8 @@ class Player {
       bestResult: this.bestResult,
       skillManager: this.skillManager.toJSON(),
       skillPoints: this.skillPoints,
+      strategyManager: this.strategyManager.toJSON(),
+      inventory: this.inventory.toJSON(),
       sponsors: this.sponsors,
       equipment: this.equipment,
       injury: this.injury,
@@ -465,6 +475,16 @@ class Player {
       player.skillManager = SkillManager.fromJSON(data.skillManager);
     }
     player.skillPoints = data.skillPoints || 0;
+    
+    // 恢复策略系统
+    if (data.strategyManager) {
+      player.strategyManager = StrategyManager.fromJSON(data.strategyManager);
+    }
+    
+    // 恢复背包系统
+    if (data.inventory) {
+      player.inventory = InventoryManager.fromJSON(data.inventory);
+    }
     
     // 确保 gender 字段有值
     if (!player.gender) {

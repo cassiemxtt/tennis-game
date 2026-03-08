@@ -170,6 +170,81 @@ const WTA_TOURNAMENT_CONFIG = {
   }
 };
 
+// ITF赛事日历 - 未来赛和挑战赛每月都有比赛
+const ITF_TOURNAMENT_CALENDAR = [
+  // 1月
+  { month: 1, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 1, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 1, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 1, weekInMonth: 4, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  
+  // 2月
+  { month: 2, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 2, weekInMonth: 2, tournaments: [], gender: null }, // 澳网周
+  { month: 2, weekInMonth: 3, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 2, weekInMonth: 4, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  
+  // 3月
+  { month: 3, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 3, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 3, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 3, weekInMonth: 4, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  
+  // 4月
+  { month: 4, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 4, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 4, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 4, weekInMonth: 4, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  
+  // 5月
+  { month: 5, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 5, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 5, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 5, weekInMonth: 4, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  
+  // 6月
+  { month: 6, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 6, weekInMonth: 2, tournaments: [], gender: null }, // 法网周
+  { month: 6, weekInMonth: 3, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 6, weekInMonth: 4, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  
+  // 7月
+  { month: 7, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 7, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 7, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 7, weekInMonth: 4, tournaments: [], gender: null }, // 温网周
+  
+  // 8月
+  { month: 8, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 8, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 8, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 8, weekInMonth: 4, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  
+  // 9月
+  { month: 9, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 9, weekInMonth: 2, tournaments: [], gender: null }, // 美网周
+  { month: 9, weekInMonth: 3, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 9, weekInMonth: 4, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  
+  // 10月
+  { month: 10, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 10, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 10, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 10, weekInMonth: 4, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  
+  // 11月
+  { month: 11, weekInMonth: 1, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 11, weekInMonth: 2, tournaments: [{ type: 'CHALLENGER', name: 'ITF挑战赛' }], gender: 'male' },
+  { month: 11, weekInMonth: 3, tournaments: [{ type: 'FUTURES', name: 'ITF未来赛' }], gender: 'male' },
+  { month: 11, weekInMonth: 4, tournaments: [], gender: null },
+  
+  // 12月 - 休赛期
+  { month: 12, weekInMonth: 1, tournaments: [], gender: null },
+  { month: 12, weekInMonth: 2, tournaments: [], gender: null },
+  { month: 12, weekInMonth: 3, tournaments: [], gender: null },
+  { month: 12, weekInMonth: 4, tournaments: [], gender: null }
+];
+
 // 赛事日历 - 模拟真实网球赛季
 // 格式：{ month: 月份, weekInMonth: 第几周(1-4), tournaments: [赛事列表], gender: 'male'/'female' }
 // tournaments: 数组，可以有多场比赛，玩家选择参加其中一个
@@ -256,6 +331,40 @@ class TournamentCalendar {
     
     // 查找当月的赛事
     for (const calEvent of TOURNAMENT_CALENDAR) {
+      if (calEvent.month === month) {
+        // 检查周数是否匹配
+        if (calEvent.weekInMonth !== weekInMonth) continue;
+        
+        // 检查性别匹配
+        if (calEvent.gender === 'both' || calEvent.gender === gender) {
+          // 遍历该周的所有赛事
+          for (const t of calEvent.tournaments) {
+            const config = gender === 'male' ? ATP_TOURNAMENT_CONFIG : WTA_TOURNAMENT_CONFIG;
+            const tournamentConfig = config[t.type];
+            
+            if (tournamentConfig) {
+              tournaments.push({
+                type: t.type,
+                name: t.name,  // 赛事名称
+                config: tournamentConfig,
+                gender: gender
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    return tournaments;
+  }
+
+  // 获取指定周的ITF赛事
+  static getITFTournaments(year, month, gender, week) {
+    const tournaments = [];
+    const weekInMonth = week ? this.getWeekInMonth(week) : 1;
+    
+    // 查找当月的ITF赛事
+    for (const calEvent of ITF_TOURNAMENT_CALENDAR) {
       if (calEvent.month === month) {
         // 检查周数是否匹配
         if (calEvent.weekInMonth !== weekInMonth) continue;
@@ -1007,6 +1116,7 @@ module.exports = {
   ATP_TOURNAMENT_CONFIG,
   WTA_TOURNAMENT_CONFIG,
   TOURNAMENT_CALENDAR,
+  ITF_TOURNAMENT_CALENDAR,
   TournamentCalendar,
   Tournament,
   Opponent,

@@ -84,7 +84,7 @@ class HomeScene extends Scene {
       fontSize: width * 0.035
     });
 
-    // 第二行：赞助 | 生涯 | 团队
+    // 第二行：赞助 | 生涯 | 道具
     this.addButton(width * 0.04, startY + btnHeight + spacing, btnWidth, btnHeight, '💰 赞助', () => {
       this.game.changeScene(GAME_STATE.SPONSOR);
     }, {
@@ -101,7 +101,16 @@ class HomeScene extends Scene {
       fontSize: width * 0.035
     });
 
-    this.addButton(width * 0.72, startY + btnHeight + spacing, btnWidth, btnHeight, '👨‍🏫 团队', () => {
+    this.addButton(width * 0.72, startY + btnHeight + spacing, btnWidth, btnHeight, '🎒 道具', () => {
+      this.game.changeScene(GAME_STATE.ITEM);
+    }, {
+      bgColor: '#805ad5',
+      textColor: '#ffffff',
+      fontSize: width * 0.035
+    });
+
+    // 第三行：团队 | （空）| （空）
+    this.addButton(width * 0.04, startY + (btnHeight + spacing) * 2, btnWidth, btnHeight, '👨‍🏫 团队', () => {
       this.game.changeScene(GAME_STATE.COACH);
     }, {
       bgColor: '#805ad5',
@@ -178,6 +187,14 @@ class HomeScene extends Scene {
   nextWeek() {
     const player = this.game.player;
     const gameData = this.game.gameData;
+
+    // 检查是否有报名但未完成的比赛，如果有则自动退赛
+    const ongoingTournament = gameData.ongoingTournament;
+    if (ongoingTournament && ongoingTournament.matchName) {
+      // 清除正在进行比赛
+      gameData.ongoingTournament = null;
+      this.game.showToast(`⚠️ 未完成比赛，已自动退赛`);
+    }
 
     // 重置每周操作次数
     this.game.resetWeeklyActions();
