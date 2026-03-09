@@ -340,7 +340,8 @@ class MatchScene extends Scene {
             };
           }
           
-          const isCurrentWeek = (month === currentMonth);
+          // 只有当前月份且当前周的比赛才能参加
+          const isCurrentWeek = (month === currentMonth && week === currentWeek);
           const canJoin = isCurrentWeek && this.game.canPlayMatch();
           
           grouped[monthKey].tournaments.push({
@@ -770,46 +771,45 @@ class MatchScene extends Scene {
       const textColor = isOwned ? '#fff' : '#718096';
       
       this.addButton(x, y, btnWidth, btnHeight, s.label, () => {
-        if (isOwned) {
-          // 先计算并显示胜率预览
-          const preview = this.calculateStrategyPreview(s.type);
-          this.selectedStrategyPreview = preview;
-          this.selectedStrategyType = s.type; // 保存选中的策略类型
-          
-          // 重新渲染显示胜率预览
-          this.buttons = this.buttons.slice(0, 1); // 只保留返回
-          
-          const canvasWidth = this.game.canvasWidth || 375;
-          const canvasHeight = this.game.canvasHeight || 667;
-          
-          // 显示确认按钮
-          this.addButton(canvasWidth * 0.08, canvasHeight * 0.58, canvasWidth * 0.42, canvasHeight * 0.065, '✓ 确认', () => {
+        // 点击策略后先显示胜率预览和确认/取消按钮
+        // 不管是否拥有该策略，都需要确认后才能进入比赛
+        
+        // 计算胜率预览（如果是未拥有的策略，使用0加成）
+        const preview = this.calculateStrategyPreview(isOwned ? s.type : null);
+        this.selectedStrategyPreview = preview;
+        this.selectedStrategyType = s.type; // 保存选中的策略类型
+
+        // 重新渲染显示胜率预览
+        this.buttons = this.buttons.slice(0, 1); // 只保留返回
+
+        const canvasWidth = this.game.canvasWidth || 375;
+        const canvasHeight = this.game.canvasHeight || 667;
+
+        // 显示确认按钮
+        this.addButton(canvasWidth * 0.08, canvasHeight * 0.58, canvasWidth * 0.42, canvasHeight * 0.065, '✓ 确认', () => {
+          if (isOwned) {
             strategyManager.selectStrategy(s.type);
             player.strategyManager = strategyManager;
-            this.playCurrentMatch(s.type);
-          }, {
-            bgColor: s.color,
-            textColor: '#fff',
-            fontSize: canvasWidth * 0.035,
-            borderColor: s.color,
-            borderWidth: 2
-          });
-          
-          // 添加取消按钮
-          this.addButton(canvasWidth * 0.5, canvasHeight * 0.58, canvasWidth * 0.42, canvasHeight * 0.065, '✗ 取消', () => {
-            this.selectedStrategyPreview = null;
-            this.selectedStrategyType = null;
-            this.startCurrentMatch(); // 重新渲染
-          }, {
-            bgColor: '#4a5568',
-            textColor: '#fff',
-            fontSize: canvasWidth * 0.035
-          });
-        } else {
-          // 未拥有该策略，使用默认策略（无加成）
-          this.game.showToast('未拥有该策略，将使用默认策略');
-          this.playCurrentMatch(null); // null 表示默认策略
-        }
+          }
+          this.playCurrentMatch(isOwned ? s.type : null);
+        }, {
+          bgColor: isOwned ? s.color : '#4a5568',
+          textColor: '#fff',
+          fontSize: canvasWidth * 0.035,
+          borderColor: isOwned ? s.color : '#718096',
+          borderWidth: 2
+        });
+
+        // 添加取消按钮
+        this.addButton(canvasWidth * 0.5, canvasHeight * 0.58, canvasWidth * 0.42, canvasHeight * 0.065, '✗ 取消', () => {
+          this.selectedStrategyPreview = null;
+          this.selectedStrategyType = null;
+          this.startCurrentMatch(); // 重新渲染
+        }, {
+          bgColor: '#4a5568',
+          textColor: '#fff',
+          fontSize: canvasWidth * 0.035
+        });
       }, {
         bgColor: bgColor,
         textColor: textColor,
@@ -823,7 +823,38 @@ class MatchScene extends Scene {
     if (ownedStrategies.length === 0) {
       const defaultBtnY = canvasHeight * 0.62;
       this.addButton(canvasWidth * 0.15, defaultBtnY, canvasWidth * 0.7, canvasHeight * 0.065, '⚔️ 默认策略（无加成）', () => {
-        this.playCurrentMatch(null);
+        // 点击默认策略后也显示确认流程
+        const preview = this.calculateStrategyPreview(null);
+        this.selectedStrategyPreview = preview;
+        this.selectedStrategyType = null;
+
+        // 重新渲染显示胜率预览
+        this.buttons = this.buttons.slice(0, 1); // 只保留返回
+
+        const canvasWidth = this.game.canvasWidth || 375;
+        const canvasHeight = this.game.canvasHeight || 667;
+
+        // 显示确认按钮
+        this.addButton(canvasWidth * 0.08, canvasHeight * 0.58, canvasWidth * 0.42, canvasHeight * 0.065, '✓ 确认', () => {
+          this.playCurrentMatch(null);
+        }, {
+          bgColor: '#4a5568',
+          textColor: '#fff',
+          fontSize: canvasWidth * 0.035,
+          borderColor: '#718096',
+          borderWidth: 2
+        });
+
+        // 添加取消按钮
+        this.addButton(canvasWidth * 0.5, canvasHeight * 0.58, canvasWidth * 0.42, canvasHeight * 0.065, '✗ 取消', () => {
+          this.selectedStrategyPreview = null;
+          this.selectedStrategyType = null;
+          this.startCurrentMatch(); // 重新渲染
+        }, {
+          bgColor: '#4a5568',
+          textColor: '#fff',
+          fontSize: canvasWidth * 0.035
+        });
       }, {
         bgColor: '#4a5568',
         textColor: '#fff',
@@ -2406,8 +2437,13 @@ class MatchScene extends Scene {
     ctx.fillStyle = '#8892b0';
     ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
     ctx.textAlign = 'center';
-    const hintText = ownedStrategies.length > 0 ? '点击已拥有的策略查看胜率' : '暂无策略，请先在道具系统中合成';
-    ctx.fillText(hintText, canvasWidth / 2, canvasHeight * 0.92);
+    // 如果已经显示了胜率预览，提示不同
+    if (this.selectedStrategyPreview) {
+      ctx.fillText('点击"确认"开始比赛，点击"取消"重新选择', canvasWidth / 2, canvasHeight * 0.92);
+    } else {
+      const hintText = ownedStrategies.length > 0 ? '点击策略查看胜率，确认后进入比赛' : '暂无策略，点击默认策略查看胜率';
+      ctx.fillText(hintText, canvasWidth / 2, canvasHeight * 0.92);
+    }
   }
 
   // 渲染比赛结果
