@@ -1,11 +1,13 @@
 /**
  * 数据模型 - Player 球员类
- * 使用新的技能系统：7种技能 + 技能点 + 策略系统 + 道具系统
+ * 使用新的技能系统：7种技能 + 技能点 + 策略系统 + 道具系统 + 卡牌系统
  */
 const { SkillManager, SKILL_TYPES, SKILL_INFO } = require('./skill.js');
 const { Coach, COACH_LEVELS } = require('./coach.js');
 const { StrategyManager, STRATEGY_TYPES } = require('./strategy.js');
 const { InventoryManager, ITEM_TYPES } = require('./item.js');
+const { CardManager, Deck, StrategyDeck, StrategyDeckManager, STRATEGY_DECK_RULES, DECK_CARD_COUNT } = require('./deck.js');
+const { randomDraw } = require('../data/cards.js');
 
 class Player {
   constructor(name = '网球新星', gender = 'male') {
@@ -94,6 +96,108 @@ class Player {
       lob: false,
       smash: false
     };
+    
+    // ===== 卡牌系统 =====
+    this.cardManager = new CardManager();
+    this.currentDeck = new Deck();
+    
+    // ===== 策略套牌系统 =====
+    this.strategyDeckManager = new StrategyDeckManager();
+    
+    // 初始卡牌 - 每种类型给1张基础卡
+    this.initStarterCards();
+  }
+  
+  // 获取策略套牌管理器
+  getStrategyDeckManager() {
+    return this.strategyDeckManager;
+  }
+  
+  // 获取指定策略的套牌
+  getStrategyDeck(strategyType) {
+    return this.strategyDeckManager.getOrCreateDeck(strategyType);
+  }
+  
+  // 获取所有策略套牌
+  getAllStrategyDecks() {
+    return this.strategyDeckManager.getAllDecks();
+  }
+  
+  // 检查是否有完整套牌可以使用
+  hasCompleteDeck() {
+    return this.strategyDeckManager.getCompletedDeckCount() > 0;
+  }
+  
+  // 获取可用套牌数量
+  getCompletedDeckCount() {
+    return this.strategyDeckManager.getCompletedDeckCount();
+  }
+  
+  // 初始化玩家卡牌（每种类型给1张基础卡）
+  initStarterCards() {
+    // 发球卡
+    this.cardManager.addCard('serve_001', 1);
+    this.currentDeck.addCard('serve_001');
+    
+    // 接发球卡
+    this.cardManager.addCard('return_001', 1);
+    this.currentDeck.addCard('return_001');
+    
+    // 底线卡
+    this.cardManager.addCard('baseline_001', 2);
+    this.currentDeck.addCard('baseline_001');
+    this.currentDeck.addCard('baseline_002');
+    
+    // 截击卡
+    this.cardManager.addCard('volley_001', 1);
+    this.currentDeck.addCard('volley_001');
+    
+    // 放小球
+    this.cardManager.addCard('dropshot_001', 1);
+    this.currentDeck.addCard('dropshot_001');
+    
+    // 切削卡
+    this.cardManager.addCard('slice_001', 1);
+    this.currentDeck.addCard('slice_001');
+    
+    // 初始碎片
+    this.cardManager.addFragment('R', 10);
+    this.cardManager.addFragment('SR', 5);
+  }
+  
+  // 抽卡（单抽）
+  drawCard() {
+    const card = randomDraw();
+    if (card) {
+      this.cardManager.addCard(card.id, 1);
+      return card;
+    }
+    return null;
+  }
+  
+  // 十连抽
+  drawTenCards() {
+    const { drawTen } = require('../data/cards.js');
+    const cards = drawTen();
+    for (const card of cards) {
+      this.cardManager.addCard(card.id, 1);
+    }
+    return cards;
+  }
+  
+  // 获取当前卡组
+  getDeck() {
+    return this.currentDeck;
+  }
+  
+  // 获取卡牌管理器
+  getCardManager() {
+    return this.cardManager;
+  }
+  
+  // 获取卡组卡牌列表（用于战斗）
+  getBattleCards() {
+    return this.currentDeck.cards;
   }
   
   // 检查是否有伤病影响
@@ -462,7 +566,12 @@ class Player {
       trainingPoints: this.trainingPoints,
       trainingCoach: this.trainingCoach,
       plateauCount: this.plateauCount,
-      inPlateau: this.inPlateau
+      inPlateau: this.inPlateau,
+      // 卡牌系统
+      cardManager: this.cardManager ? this.cardManager.toJSON() : null,
+      currentDeck: this.currentDeck ? this.currentDeck.toJSON() : null,
+      // 策略套牌系统
+      strategyDeckManager: this.strategyDeckManager ? this.strategyDeckManager.toJSON() : null
     };
   }
 
@@ -500,6 +609,19 @@ class Player {
     player.inPlateau = data.inPlateau || {
       baseline: false, volley: false, serve: false, dropShot: false, slice: false, lob: false, smash: false
     };
+    
+    // 恢复卡牌系统
+    if (data.cardManager) {
+      player.cardManager = CardManager.fromJSON(data.cardManager);
+    }
+    if (data.currentDeck) {
+      player.currentDeck = Deck.fromJSON(data.currentDeck);
+    }
+    
+    // 恢复策略套牌系统
+    if (data.strategyDeckManager) {
+      player.strategyDeckManager = StrategyDeckManager.fromJSON(data.strategyDeckManager);
+    }
     
     // 更新技能加成
     player.updateSkillBonuses();

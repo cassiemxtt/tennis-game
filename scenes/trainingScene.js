@@ -98,7 +98,6 @@ class TrainingScene extends Scene {
     this.scrollOffset -= deltaY;
     if (this.scrollOffset < 0) this.scrollOffset = 0;
     if (this.scrollOffset > this.maxScroll) this.scrollOffset = this.maxScroll;
-    console.log('Training scroll:', this.scrollOffset, 'max:', this.maxScroll);
   }
 
   // 获取已雇佣的教练列表
@@ -413,14 +412,14 @@ class TrainingScene extends Scene {
     }
   }
 
-  // 触摸处理
+  // 触摸处理 - 与其他场景保持一致
   handleTouch(x, y, type) {
     if (type === 'touchstart') {
       // 记录触摸起始位置和时间
       this.touchStartX = x;
       this.touchStartY = y;
       this.touchStartTime = Date.now();
-      this.touchMoved = false;
+      this.isScrolling = false;
     } else if (type === 'touchmove') {
       // 计算移动距离
       const dx = x - this.touchStartX;
@@ -428,8 +427,8 @@ class TrainingScene extends Scene {
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       // 如果移动超过阈值，认为是滑动
-      if (distance > this.scrollThreshold) {
-        this.touchMoved = true;
+      if (distance > 10) {
+        this.isScrolling = true;
         // 触发了滑动，处理滚动
         const deltaY = y - this.touchStartY;
         this.handleScroll(deltaY);
@@ -438,7 +437,7 @@ class TrainingScene extends Scene {
     } else if (type === 'touchend') {
       // 检查是否是点击（没有滑动且触摸时间短）
       const touchDuration = Date.now() - this.touchStartTime;
-      if (!this.touchMoved && touchDuration < 300) {
+      if (!this.isScrolling && touchDuration < 300) {
         this.handleTap(x, y);
       }
     }

@@ -1,10 +1,12 @@
 /**
- * 比赛场景 - 签表系统版
+ * 比赛场景 - 签表系统版（含卡牌对战）
  */
 const { Scene, GAME_STATE } = require('./scene.js');
 const { Match, MatchLevel } = require('../models/match.js');
 const { Tournament, MATCH_STRATEGY, MatchStrategy, InjurySystem, TOURNAMENT_CONFIG, TournamentCalendar, ATP_TOURNAMENT_CONFIG, WTA_TOURNAMENT_CONFIG, setGameData } = require('../models/tournament.js');
 const { STRATEGY_CONFIG, STRATEGY_TYPES, getStrategyConfig, calculateStrategyBonus, checkStrategyCounter, StrategyManager } = require('../models/strategy.js');
+const { Battle, BATTLE_PHASE } = require('../models/battle.js');
+const { getCardById, CARD_TYPE } = require('../data/cards.js');
 
 class MatchScene extends Scene {
   constructor(game) {
@@ -27,6 +29,13 @@ class MatchScene extends Scene {
     this.tournamentScrollY = 0; // 赛事列表滚动位置
     this.maxTournamentScrollY = 0; // 最大滚动位置
     this.currentTab = 'pro'; // 'pro' 职业赛事, 'itf' ITF赛事
+
+    // 卡牌对战系统
+    this.battleMode = 'classic'; // 'classic' 经典模式, 'card' 卡牌对战
+    this.cardBattle = null; // 卡牌对战实例
+    this.playerCards = []; // 玩家当前可用的卡牌
+    this.selectedCardIndex = -1; // 选中的卡牌索引
+    this.battleLogs = []; // 战斗日志
 
     this.initUI();
   }
@@ -158,6 +167,11 @@ class MatchScene extends Scene {
         this.handleITFTournamentTap(x, y, canvasWidth, canvasHeight);
       }
     }
+    
+    // 处理卡牌对战界面的卡牌点击
+    if (this.tournamentPhase === 'cardBattle') {
+      this.handleCardTap(x, y);
+    }
   }
 
   // 处理职业赛事点击
@@ -248,7 +262,15 @@ class MatchScene extends Scene {
   
   // 处理返回按钮
   handleBack() {
-    if (this.tournamentPhase === 'match') {
+    if (this.tournamentPhase === 'deckSelect') {
+      // 套牌选择页面返回到签表页面
+      this.tournamentPhase = 'bracket';
+      this.setupBracketButtons();
+    } else if (this.tournamentPhase === 'cardBattle') {
+      // 卡牌对战返回到签表页面
+      this.tournamentPhase = 'bracket';
+      this.setupBracketButtons();
+    } else if (this.tournamentPhase === 'match') {
       // 策略选择页面返回到签表页面
       this.tournamentPhase = 'bracket';
       this.setupBracketButtons();
@@ -660,17 +682,53 @@ class MatchScene extends Scene {
     // 清除按钮，只保留返回
     this.buttons = this.buttons.slice(0, 1);
     
-    // 添加继续按钮
+    // 添加模式选择按钮
     const canvasWidth = this.game.canvasWidth || 375;
     const canvasHeight = this.game.canvasHeight || 667;
     
-    this.addButton(canvasWidth * 0.3, canvasHeight * 0.75, canvasWidth * 0.4, canvasHeight * 0.08, '开始比赛', () => {
+    // 检查玩家是否有卡牌
+    const playerCards = player.cardManager ? player.cardManager.getOwnedCards() : [];
+    const hasCards = playerCards && playerCards.length > 0;
+    
+    // 经典模式按钮
+    this.addButton(canvasWidth * 0.08, canvasHeight * 0.65, canvasWidth * 0.38, canvasHeight * 0.08, '⚔️ 经典模式', () => {
+      this.battleMode = 'classic';
       this.startCurrentMatch();
     }, {
-      bgColor: '#64ffda',
-      textColor: '#0a192f',
-      fontSize: canvasWidth * 0.04
+      bgColor: '#4a5568',
+      textColor: '#fff',
+      fontSize: canvasWidth * 0.035
     });
+    
+    // 卡牌对战模式按钮（如果有卡牌）
+    if (hasCards) {
+      this.addButton(canvasWidth * 0.54, canvasHeight * 0.65, canvasWidth * 0.38, canvasHeight * 0.08, '🃏 卡牌对战', () => {
+        this.battleMode = 'card';
+        // 先检查是否有配置好的套牌
+        const playerDeck = player.currentDeck;
+        const deckCards = playerDeck ? playerDeck.cards : [];
+        if (deckCards.length < 3) {
+          this.game.showToast('套牌至少需要3张卡，请先去背包配置！');
+          return;
+        }
+        // 进入套牌选择阶段
+        this.tournamentPhase = 'deckSelect';
+        this.setupDeckSelectButtons();
+      }, {
+        bgColor: '#805ad5',
+        textColor: '#fff',
+        fontSize: canvasWidth * 0.035
+      });
+    } else {
+      // 没有卡牌显示灰色按钮
+      this.addButton(canvasWidth * 0.54, canvasHeight * 0.65, canvasWidth * 0.38, canvasHeight * 0.08, '🃏 卡牌对战', () => {
+        this.game.showToast('暂无卡牌，请先抽卡！');
+      }, {
+        bgColor: '#2d3748',
+        textColor: '#718096',
+        fontSize: canvasWidth * 0.035
+      });
+    }
   }
 
   // 获取场地类型（根据赛事名称判断）
@@ -1358,10 +1416,1090 @@ class MatchScene extends Scene {
       this.renderMatchSelection(ctx, player);
     } else if (this.tournamentPhase === 'bracket') {
       this.renderBracket(ctx, player);
+    } else if (this.tournamentPhase === 'deckSelect') {
+      this.renderDeckSelect(ctx, player);
     } else if (this.tournamentPhase === 'match') {
       this.renderMatch(ctx, player);
+    } else if (this.tournamentPhase === 'cardBattle') {
+      this.renderCardBattle(ctx, player);
     } else if (this.tournamentPhase === 'result') {
       this.renderMatchResult(ctx, player);
+    }
+  }
+
+  // 设置套牌选择界面按钮
+  setupDeckSelectButtons() {
+    // 清除按钮，只保留返回
+    this.buttons = this.buttons.slice(0, 1);
+    
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+    const player = this.game.player;
+    
+    // 开始卡牌对战按钮
+    this.addButton(canvasWidth * 0.25, canvasHeight * 0.75, canvasWidth * 0.5, canvasHeight * 0.08, '开始卡牌对战', () => {
+      this.startCardBattle();
+    }, {
+      bgColor: '#805ad5',
+      textColor: '#fff',
+      fontSize: canvasWidth * 0.04
+    });
+  }
+
+  // 渲染套牌选择界面
+  renderDeckSelect(ctx, player) {
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+    const tournament = this.currentTournament;
+    const config = tournament.config;
+    const opponent = this.currentOpponent;
+    
+    // 背景
+    ctx.fillStyle = '#16213e';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    // 标题栏背景
+    ctx.fillStyle = '#805ad5';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight * 0.05);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + (canvasWidth * 0.04) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🃏 选择套牌', canvasWidth / 2, canvasHeight * 0.04);
+    
+    // 赛事信息
+    ctx.fillStyle = '#8892b0';
+    ctx.font = (canvasWidth * 0.028) + 'px sans-serif';
+    ctx.fillText(config.name + ' 第' + tournament.currentRound + '轮', canvasWidth / 2, canvasHeight * 0.09);
+    
+    // 对手信息
+    ctx.fillStyle = '#f56565';
+    ctx.font = (canvasWidth * 0.035) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('👤 对手: ' + (opponent ? opponent.name : '未知'), canvasWidth * 0.05, canvasHeight * 0.14);
+    ctx.fillText('综合: ' + (opponent ? opponent.calculateOverall() : 0), canvasWidth * 0.05, canvasHeight * 0.17);
+    
+    // 套牌信息区域
+    const deckAreaY = canvasHeight * 0.21;
+    ctx.fillStyle = 'rgba(100, 255, 218, 0.1)';
+    ctx.fillRect(canvasWidth * 0.03, deckAreaY, canvasWidth * 0.94, canvasHeight * 0.45);
+    ctx.strokeStyle = 'rgba(100, 255, 218, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(canvasWidth * 0.03, deckAreaY, canvasWidth * 0.94, canvasHeight * 0.45);
+    
+    // 套牌标题
+    ctx.fillStyle = '#64ffda';
+    ctx.font = 'bold ' + (canvasWidth * 0.035) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('当前套牌 (' + (player.currentDeck ? player.currentDeck.cards.length : 0) + '张)', canvasWidth / 2, deckAreaY + canvasHeight * 0.04);
+    
+    // 获取套牌中的卡牌
+    const deckCards = player.currentDeck ? player.currentDeck.cards : [];
+    const cardWidth = canvasWidth * 0.16;
+    const cardHeight = canvasHeight * 0.15;
+    const cardSpacing = canvasWidth * 0.02;
+    const startY = deckAreaY + canvasHeight * 0.08;
+    
+    if (deckCards.length === 0) {
+      ctx.fillStyle = '#8892b0';
+      ctx.font = (canvasWidth * 0.03) + 'px sans-serif';
+      ctx.fillText('暂无套牌，请先配置套牌', canvasWidth / 2, startY + cardHeight / 2);
+    } else {
+      // 每行显示4张卡
+      const cardsPerRow = 4;
+      for (let i = 0; i < deckCards.length; i++) {
+        const row = Math.floor(i / cardsPerRow);
+        const col = i % cardsPerRow;
+        const cardX = canvasWidth * 0.08 + col * (cardWidth + cardSpacing);
+        const cardY = startY + row * (cardHeight + canvasHeight * 0.02);
+        
+        // 获取卡牌信息
+        const cardId = deckCards[i];
+        const card = getCardById(cardId);
+        
+        if (card) {
+          // 绘制卡牌背景
+          let cardBgColor, borderColor;
+          if (card.type === 'serve') {
+            cardBgColor = '#1e3a5f';
+            borderColor = '#4299e1';
+          } else if (card.type === 'return') {
+            cardBgColor = '#3d1f3d';
+            borderColor = '#9f7aea';
+          } else {
+            cardBgColor = '#1a1a2e';
+            borderColor = 'rgba(100, 255, 218, 0.5)';
+          }
+          
+          this.drawRoundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8, cardBgColor, borderColor, 2);
+          
+          // 卡牌类型图标
+          ctx.fillStyle = borderColor;
+          ctx.font = (canvasWidth * 0.06) + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(this.getCardTypeIcon(card.type), cardX + cardWidth / 2, cardY + cardHeight * 0.25);
+          
+          // 卡牌名称
+          ctx.fillStyle = borderColor;
+          ctx.font = 'bold ' + (canvasWidth * 0.02) + 'px sans-serif';
+          const cardName = card.name ? card.name.substring(0, 5) : '未知';
+          ctx.fillText(cardName, cardX + cardWidth / 2, cardY + cardHeight * 0.5);
+          
+          // 难度值
+          ctx.fillStyle = '#ffd700';
+          ctx.font = (canvasWidth * 0.024) + 'px sans-serif';
+          ctx.fillText('⚔️' + (card.diff || 0), cardX + cardWidth / 2, cardY + cardHeight * 0.75);
+          
+          // 稀有度
+          let rarityColor = '#718096';
+          if (card.rarity === 'R') rarityColor = '#4299e1';
+          else if (card.rarity === 'SR') rarityColor = '#805ad5';
+          else if (card.rarity === 'SSR') rarityColor = '#ffd700';
+          else if (card.rarity === 'UR') rarityColor = '#f56565';
+          ctx.fillStyle = rarityColor;
+          ctx.fillRect(cardX + 3, cardY + 3, cardWidth - 6, 3);
+        }
+      }
+    }
+    
+    // 提示信息
+    ctx.fillStyle = '#ffd700';
+    ctx.font = (canvasWidth * 0.028) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('套牌至少需要3张卡才能进行卡牌对战', canvasWidth / 2, deckAreaY + canvasHeight * 0.42);
+    
+    // 渲染按钮
+    for (const button of this.buttons) {
+      button.render(ctx);
+    }
+    
+    // 底部提示
+    ctx.fillStyle = '#8892b0';
+    ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+    ctx.fillText('点击"开始卡牌对战"继续', canvasWidth / 2, canvasHeight * 0.92);
+  }
+
+  // 开始卡牌对战 - 改为自动对战
+  startCardBattle() {
+    const player = this.game.player;
+    
+    // 检查精力
+    if (player.energy < 10) {
+      this.game.showToast('精力不足，需要至少10精力');
+      return;
+    }
+    
+    // 增加比赛次数计数
+    this.game.addMatchAction();
+    
+    if (!this.currentTournament) return;
+    
+    const matchInfo = this.currentTournament.getCurrentMatchInfo();
+    
+    // 检查是否已经结束
+    if (matchInfo.champion) {
+      this.handleTournamentEnd(true);
+      return;
+    }
+    
+    if (matchInfo.eliminated) {
+      this.handleTournamentEnd(false);
+      return;
+    }
+    
+    this.currentOpponent = matchInfo.opponent;
+    
+    if (!this.currentOpponent) {
+      this.game.showToast('无法获取对手信息');
+      return;
+    }
+    
+    // 直接进行自动对战结算
+    this.autoCardBattle();
+  }
+
+  // 自动卡牌对战结算
+  autoCardBattle() {
+    const player = this.game.player;
+    const opponent = this.currentOpponent;
+    
+    // 获取玩家当前套牌
+    const playerDeck = player.currentDeck || [];
+    let playerCards = [];
+    
+    if (playerDeck && playerDeck.cards && playerDeck.cards.length > 0) {
+      playerCards = [...playerDeck.cards];
+    } else if (player.cardManager) {
+      // 如果没有套牌，使用cardManager的卡牌
+      const ownedCards = player.cardManager.getOwnedCards() || [];
+      playerCards = ownedCards.slice(0, 8).map(c => c.id);
+    }
+    
+    // 获取对手卡牌（模拟）
+    const opponentCards = this.generateOpponentCards(opponent);
+    
+    // 计算双方总能力
+    const playerTotalPower = this.calculateDeckPower(playerCards, player);
+    const opponentTotalPower = this.calculateDeckPower(opponentCards, opponent);
+    
+    // 计算胜率
+    const baseWinRate = 50 + (playerTotalPower - opponentTotalPower) * 0.3;
+    
+    // 加入策略加成
+    const strategyManager = player.strategyManager || { getCurrentStrategy: () => null };
+    const currentStrategy = strategyManager.getCurrentStrategy();
+    let strategyBonus = 0;
+    if (currentStrategy) {
+      const strategyConfig = getStrategyConfig(currentStrategy);
+      if (strategyConfig && strategyConfig.bonusPercent) {
+        strategyBonus = strategyConfig.bonusPercent * 100;
+      }
+    }
+    
+    const finalWinRate = Math.max(10, Math.min(90, baseWinRate + strategyBonus));
+    
+    // 随机结果
+    const playerWins = Math.random() * 100 < finalWinRate;
+    
+    // 计算精力消耗
+    let energyCost = 15;
+    player.energy = Math.max(0, player.energy - energyCost);
+    player.fatigue = Math.min(100, player.fatigue + energyCost);
+    
+    // 处理比赛结果
+    const result = this.currentTournament.playMatch(playerWins);
+    
+    // 更新玩家数据
+    player.matchesPlayed++;
+    if (playerWins) {
+      player.matchesWon++;
+    }
+    
+    // 计算奖金和积分
+    const prize = result.prize;
+    const points = result.points;
+    
+    if (playerWins) {
+      player.money += prize;
+      player.careerEarnings += prize;
+      player.points += points;
+      player.titles++;
+      
+      if (prize > 0) {
+        this.game.showToast(`🎉 第${result.currentRound}轮获胜！奖金$${prize}`);
+      }
+    } else {
+      player.points = Math.max(0, player.points - 10);
+      this.game.showToast(`😔 第${result.currentRound}轮淘汰...奖金$${prize}`);
+    }
+    
+    // 记录操作
+    const match = this.currentTournament ? this.currentTournament.matchInfo : null;
+    const matchName = match ? match.name : '比赛';
+    const roundName = ['', '第一轮', '第二轮', '第三轮', '第四轮', '第五轮', '决赛'][result.currentRound] || `第${result.currentRound}轮`;
+    this.game.recordAction('match', matchName, playerWins ? `${roundName}获胜 奖金$${prize}` : `${roundName}淘汰`);
+    
+    // 更新排名
+    if (points > 0) {
+      player.ranking = Math.max(1, player.ranking - Math.floor(points / 10));
+      if (player.ranking < player.careerHighRanking) {
+        player.careerHighRanking = player.ranking;
+      }
+    }
+    
+    // 保存结果
+    this.currentMatchResult = {
+      won: playerWins,
+      prize: prize,
+      points: points,
+      winRate: finalWinRate,
+      strategy: currentStrategy ? getStrategyConfig(currentStrategy)?.name || '策略套牌' : '策略套牌',
+      injury: null,
+      round: result.currentRound,
+      energyCost: energyCost,
+      calculationDetails: {
+        baseWinRate: baseWinRate.toFixed(1),
+        strategyBonus: strategyBonus.toFixed(1),
+        playerPower: playerTotalPower,
+        opponentPower: opponentTotalPower
+      }
+    };
+    
+    // 进入结果界面
+    this.tournamentPhase = 'result';
+    
+    // 设置按钮
+    this.buttons = this.buttons.slice(0, 1);
+    
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+    
+    const nextMatchInfo = this.currentTournament.getCurrentMatchInfo();
+    
+    if (nextMatchInfo.champion) {
+      this.addButton(canvasWidth * 0.3, canvasHeight * 0.7, canvasWidth * 0.4, canvasHeight * 0.08, '🏆 夺冠！', () => {
+        this.finishTournament();
+      }, {
+        bgColor: '#ffd700',
+        textColor: '#0a192f',
+        fontSize: canvasWidth * 0.045
+      });
+    } else if (nextMatchInfo.eliminated) {
+      this.addButton(canvasWidth * 0.3, canvasHeight * 0.7, canvasWidth * 0.4, canvasHeight * 0.08, '继续', () => {
+        this.finishTournament();
+      }, {
+        bgColor: '#64ffda',
+        textColor: '#0a192f',
+        fontSize: canvasWidth * 0.04
+      });
+    } else {
+      this.addButton(canvasWidth * 0.3, canvasHeight * 0.7, canvasWidth * 0.4, canvasHeight * 0.08, '下一轮', () => {
+        this.startCardBattle();
+      }, {
+        bgColor: '#64ffda',
+        textColor: '#0a192f',
+        fontSize: canvasWidth * 0.04
+      });
+    }
+  }
+
+  // 生成对手卡牌
+  generateOpponentCards(opponent) {
+    const { CARD_TYPE, CARDS } = require('../data/cards.js');
+    const opponentCards = [];
+    const cardTypes = Object.values(CARD_TYPE).filter(t => 
+      t !== 'coach' && t !== 'item' && t !== 'strategy' && t !== 'ultimate'
+    );
+    
+    // 根据对手能力生成8张卡
+    const opponentOverall = opponent ? opponent.calculateOverall() : 50;
+    const cardCount = 8;
+    
+    for (let i = 0; i < cardCount; i++) {
+      const randomType = cardTypes[Math.floor(Math.random() * cardTypes.length)];
+      const cardsOfType = Object.values(CARDS).filter(c => c.type === randomType);
+      
+      if (cardsOfType.length > 0) {
+        // 根据对手能力选择合适难度的卡
+        const difficulty = Math.min(80, Math.max(20, opponentOverall - 20 + Math.random() * 40));
+        let bestCard = cardsOfType[0];
+        let bestDiff = Math.abs((bestCard.diff || 20) - difficulty);
+        
+        for (const card of cardsOfType) {
+          const diff = Math.abs((card.diff || 20) - difficulty);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestCard = card;
+          }
+        }
+        
+        opponentCards.push(bestCard.id);
+      }
+    }
+    
+    return opponentCards;
+  }
+
+  // 计算套牌总能力
+  calculateDeckPower(cardIds, player) {
+    const { getCardById } = require('../data/cards.js');
+    let totalPower = 0;
+    
+    for (const cardId of cardIds) {
+      const card = getCardById(cardId);
+      if (card) {
+        // 卡牌基础能力 = 难度 + 成功率
+        const basePower = (card.diff || 20) + (card.acc || 50);
+        totalPower += basePower;
+      }
+    }
+    
+    // 加入玩家技能加成
+    if (player && player.skillManager && player.skillManager.skills) {
+      const skills = player.skillManager.skills;
+      // 技能加成：技能越高，卡牌效果越好
+      const skillBonus = 
+        (skills.serve ? skills.serve.getFinalScore() : 50) +
+        (skills.baseline ? skills.baseline.getFinalScore() : 50) +
+        (skills.volley ? skills.volley.getFinalScore() : 50);
+      totalPower += skillBonus * 0.5;
+    }
+    
+    return totalPower;
+  }
+  
+  // 获取当前可用的卡牌类型（根据发球/接发球局）
+  getAvailableCardTypes() {
+    // 检查是否是发球局
+    const isServeGame = this.cardBattle && this.cardBattle.state && this.cardBattle.state.server === 'player';
+    
+    if (isServeGame) {
+      // 玩家是发球方：只能使用发球卡
+      return ['serve'];
+    } else {
+      // 玩家是接发球方：只能使用接发球卡
+      return ['return'];
+    }
+  }
+  
+  // 过滤当前可用的卡牌
+  getFilteredCards() {
+    const availableTypes = this.getAvailableCardTypes();
+    const playerHand = this.cardBattle ? this.cardBattle.playerHand : [];
+    
+    return playerHand.filter(card => availableTypes.includes(card.type));
+  }
+  
+  // 检查卡牌是否在当前回合可用
+  isCardUsable(card) {
+    const availableTypes = this.getAvailableCardTypes();
+    return availableTypes.includes(card.type);
+  }
+
+  // 设置卡牌对战按钮
+  setupCardBattleButtons() {
+    this.buttons = this.buttons.slice(0, 1); // 只保留返回
+    
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+    
+    // 如果玩家已选择卡牌，显示确认按钮
+    if (this.selectedCardIndex >= 0 && !this.cardBattle.isPlayerTurnComplete) {
+      this.addButton(canvasWidth * 0.25, canvasHeight * 0.78, canvasWidth * 0.5, canvasHeight * 0.08, '确认出牌', () => {
+        this.playCard();
+      }, {
+        bgColor: '#805ad5',
+        textColor: '#fff',
+        fontSize: canvasWidth * 0.04
+      });
+    }
+  }
+
+  // 出牌
+  playCard() {
+    if (this.selectedCardIndex < 0 || !this.cardBattle) return;
+    
+    // 获取当前是发球局还是接发球局
+    const isServeGame = this.cardBattle.state.server === 'player';
+    
+    // 玩家出牌
+    const playerCard = this.cardBattle.playCard('player', this.selectedCardIndex);
+
+    if (playerCard) {
+      this.battleLogs.push({
+        text: `你使用了 ${playerCard.name}`,
+        type: 'player'
+      });
+
+      // 电脑出牌 - 根据当前局类型选择对应类型的卡牌
+      const opponentCard = this.cardBattle.playCardForOpponent(isServeGame ? 'serve' : 'return');
+
+      if (opponentCard) {
+        this.battleLogs.push({
+          text: `对手使用了 ${opponentCard.name}`,
+          type: 'opponent'
+        });
+      }
+
+      // 计算这回合结果 - 根据卡牌难度和技能决定胜负
+      const playerDiff = playerCard.diff || 20;
+      const opponentDiff = opponentCard ? (opponentCard.diff || 20) : 20;
+      
+      // 获取玩家相关技能加成
+      const player = this.game.player;
+      let playerSkillBonus = 0;
+      if (isServeGame && player.skillManager && player.skillManager.skills.serve) {
+        playerSkillBonus = Math.floor(player.skillManager.skills.serve.getFinalScore() / 10);
+      } else if (!isServeGame && player.skillManager && player.skillManager.skills.baseline) {
+        playerSkillBonus = Math.floor(player.skillManager.skills.baseline.getFinalScore() / 10);
+      }
+      
+      // 基础成功率：难度差决定
+      let playerWinChance = 0.5 + (opponentDiff - playerDiff) * 0.01 + playerSkillBonus * 0.01;
+      
+      // 随机因素
+      const random = Math.random();
+      const playerWins = random < playerWinChance;
+      
+      // 判断过程说明
+      let processText = '';
+      if (playerDiff > opponentDiff) {
+        processText = `你的难度(${playerDiff})高于对手(${opponentDiff})，成功率${(playerWinChance * 100).toFixed(0)}%`;
+      } else if (playerDiff < opponentDiff) {
+        processText = `你的难度(${playerDiff})低于对手(${opponentDiff})，成功率${(playerWinChance * 100).toFixed(0)}%`;
+      } else {
+        processText = `难度相当，成功率${(playerWinChance * 100).toFixed(0)}%`;
+      }
+
+      // 记录当前回合信息（用于显示双方卡牌）
+      this.currentRoundInfo = {
+        playerCard: playerCard,
+        opponentCard: opponentCard,
+        result: playerWins ? 'win' : 'lose',
+        process: processText
+      };
+
+      if (playerWins) {
+        this.battleLogs.push({
+          text: '✓ 你赢得了这一分！',
+          type: 'win'
+        });
+        // 更新比分
+        this.cardBattle.state.playerScore++;
+      } else {
+        this.battleLogs.push({
+          text: '✗ 对手赢得了这一分！',
+          type: 'lose'
+        });
+        // 更新比分
+        this.cardBattle.state.opponentScore++;
+      }
+      
+      // 检查是否赢得一局（先赢4分且净胜2分）
+      this.checkGameWin();
+    }
+
+    // 重置选择
+    this.selectedCardIndex = -1;
+
+    // 检查比赛是否结束
+    const battleResult = this.cardBattle.getResult();
+
+    if (battleResult.isComplete) {
+      // 比赛结束，处理结果
+      this.handleCardBattleEnd(battleResult);
+    } else {
+      // 继续下一分，补充手牌
+      this.cardBattle.drawCards(this.playerCards, 2);
+
+      // 更新按钮
+      this.setupCardBattleButtons();
+    }
+  }
+  
+  // 检查是否赢得一局
+  checkGameWin() {
+    const p = this.cardBattle.state.playerScore;
+    const o = this.cardBattle.state.opponentScore;
+    
+    // 先赢4球且净胜2球
+    if ((p >= 4 && p - o >= 2) || (o >= 4 && o - p >= 2)) {
+      // 赢得这局
+      if (p > o) {
+        this.cardBattle.state.playerGames++;
+        this.battleLogs.push({
+          text: '🎉 你赢下了这一局！',
+          type: 'win'
+        });
+      } else {
+        this.cardBattle.state.opponentGames++;
+        this.battleLogs.push({
+          text: '😔 对手赢下了这一局！',
+          type: 'lose'
+        });
+      }
+      
+      // 重置比分
+      this.cardBattle.state.playerScore = 0;
+      this.cardBattle.state.opponentScore = 0;
+      
+      // 切换发球权
+      this.cardBattle.state.server = this.cardBattle.state.server === 'player' ? 'opponent' : 'player';
+      
+      // 检查是否赢得一盘（先赢6局且净胜2局）
+      this.checkSetWin();
+    }
+  }
+  
+  // 检查是否赢得一盘
+  checkSetWin() {
+    const pg = this.cardBattle.state.playerGames;
+    const og = this.cardBattle.state.opponentGames;
+    
+    // 先赢6局且净胜2局
+    if ((pg >= 6 && pg - og >= 2) || (og >= 6 && og - pg >= 2)) {
+      if (pg > og) {
+        this.cardBattle.state.playerSets++;
+        this.battleLogs.push({
+          text: '🏆 你赢下了这一盘！',
+          type: 'win'
+        });
+      } else {
+        this.cardBattle.state.opponentSets++;
+        this.battleLogs.push({
+          text: '💔 对手赢下了这一盘！',
+          type: 'lose'
+        });
+      }
+      
+      // 重置局数
+      this.cardBattle.state.playerGames = 0;
+      this.cardBattle.state.opponentGames = 0;
+    }
+  }
+
+  // 处理卡牌对战结束
+  handleCardBattleEnd(battleResult) {
+    const player = this.game.player;
+    const playerWins = battleResult.playerWins;
+    
+    // 计算精力消耗
+    let energyCost = 15; // 卡牌对战消耗更多精力
+    player.energy = Math.max(0, player.energy - energyCost);
+    player.fatigue = Math.min(100, player.fatigue + energyCost);
+    
+    // 处理比赛结果
+    const result = this.currentTournament.playMatch(playerWins);
+    
+    // 更新玩家数据
+    player.matchesPlayed++;
+    if (playerWins) {
+      player.matchesWon++;
+    }
+    
+    // 计算奖金和积分
+    const prize = result.prize;
+    const points = result.points;
+    
+    if (playerWins) {
+      player.money += prize;
+      player.careerEarnings += prize;
+      player.points += points;
+      player.titles++;
+      
+      if (prize > 0) {
+        this.game.showToast(`🎉 第${result.currentRound}轮获胜！奖金$${prize}`);
+      }
+    } else {
+      player.points = Math.max(0, player.points - 10);
+      this.game.showToast(`😔 第${result.currentRound}轮淘汰...奖金$${prize}`);
+    }
+    
+    // 记录操作
+    const match = this.currentTournament ? this.currentTournament.matchInfo : null;
+    const matchName = match ? match.name : '比赛';
+    const roundName = ['', '第一轮', '第二轮', '第三轮', '第四轮', '第五轮', '决赛'][result.currentRound] || `第${result.currentRound}轮`;
+    this.game.recordAction('match', matchName, playerWins ? `${roundName}获胜 奖金$${prize}` : `${roundName}淘汰`);
+    
+    // 更新排名
+    if (points > 0) {
+      player.ranking = Math.max(1, player.ranking - Math.floor(points / 10));
+      if (player.ranking < player.careerHighRanking) {
+        player.careerHighRanking = player.ranking;
+      }
+    }
+    
+    // 保存结果
+    this.currentMatchResult = {
+      won: playerWins,
+      prize: prize,
+      points: points,
+      winRate: battleResult.playerScore / (battleResult.playerScore + battleResult.opponentScore) * 100,
+      strategy: '卡牌对战',
+      injury: null,
+      round: result.currentRound,
+      energyCost: energyCost,
+      calculationDetails: {
+        baseWinRate: '卡牌',
+        rankingBonus: '0',
+        formAdjust: 0,
+        fatiguePenalty: 0,
+        energyBonus: 0,
+        strategyBonus: battleResult.playerSkillBonus,
+        injuryPenalty: '0',
+        luckFactor: '0'
+      }
+    };
+    
+    // 进入结果界面
+    this.tournamentPhase = 'result';
+    
+    // 设置按钮
+    this.buttons = this.buttons.slice(0, 1);
+    
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+    
+    const nextMatchInfo = this.currentTournament.getCurrentMatchInfo();
+    
+    if (nextMatchInfo.champion) {
+      this.addButton(canvasWidth * 0.3, canvasHeight * 0.7, canvasWidth * 0.4, canvasHeight * 0.08, '🏆 夺冠！', () => {
+        this.finishTournament();
+      }, {
+        bgColor: '#ffd700',
+        textColor: '#0a192f',
+        fontSize: canvasWidth * 0.045
+      });
+    } else if (nextMatchInfo.eliminated) {
+      this.addButton(canvasWidth * 0.3, canvasHeight * 0.7, canvasWidth * 0.4, canvasHeight * 0.08, '继续', () => {
+        this.finishTournament();
+      }, {
+        bgColor: '#64ffda',
+        textColor: '#0a192f',
+        fontSize: canvasWidth * 0.04
+      });
+    } else {
+      this.addButton(canvasWidth * 0.3, canvasHeight * 0.7, canvasWidth * 0.4, canvasHeight * 0.08, '下一轮', () => {
+        this.startCardBattle();
+      }, {
+        bgColor: '#64ffda',
+        textColor: '#0a192f',
+        fontSize: canvasWidth * 0.04
+      });
+    }
+  }
+
+  // 渲染卡牌对战界面 - 改进版：显示双方卡牌和判断过程
+  renderCardBattle(ctx, player) {
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+    const tournament = this.currentTournament;
+    const config = tournament.config;
+    const opponent = this.currentOpponent;
+    
+    // 背景渐变效果
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(0.5, '#16213e');
+    gradient.addColorStop(1, '#0f1419');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    // 标题栏背景
+    ctx.fillStyle = '#805ad5';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight * 0.05);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + (canvasWidth * 0.04) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🃏 卡牌对战', canvasWidth / 2, canvasHeight * 0.04);
+    
+    // 发球局/接发球局提示
+    const isServeGame = this.cardBattle && this.cardBattle.state && this.cardBattle.state.server === 'player';
+    ctx.fillStyle = isServeGame ? '#ffd700' : '#64ffda';
+    ctx.font = (canvasWidth * 0.028) + 'px sans-serif';
+    ctx.fillText(isServeGame ? '🎾 你的发球局' : '🎯 你的接发球局', canvasWidth / 2, canvasHeight * 0.085);
+    
+    // 赛事信息
+    ctx.fillStyle = '#8892b0';
+    ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+    ctx.fillText(config.name + ' 第' + tournament.currentRound + '轮', canvasWidth / 2, canvasHeight * 0.105);
+    
+    // ========== 对手区域（上方）==========
+    const opponentAreaY = canvasHeight * 0.12;
+    
+    // 对手信息背景
+    ctx.fillStyle = 'rgba(245, 101, 101, 0.15)';
+    ctx.fillRect(canvasWidth * 0.02, opponentAreaY, canvasWidth * 0.96, canvasHeight * 0.08);
+    ctx.strokeStyle = 'rgba(245, 101, 101, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(canvasWidth * 0.02, opponentAreaY, canvasWidth * 0.96, canvasHeight * 0.08);
+    
+    // 对手信息
+    ctx.fillStyle = '#f56565';
+    ctx.font = 'bold ' + (canvasWidth * 0.035) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('👤 ' + (opponent ? opponent.name : '对手'), canvasWidth * 0.05, opponentAreaY + canvasHeight * 0.05);
+    
+    ctx.fillStyle = '#8892b0';
+    ctx.font = (canvasWidth * 0.024) + 'px sans-serif';
+    ctx.fillText('综合: ' + (opponent ? opponent.calculateOverall() : 0), canvasWidth * 0.35, opponentAreaY + canvasHeight * 0.05);
+    
+    // ========== 中间区域（双方卡牌对战展示）==========
+    const battleAreaY = canvasHeight * 0.21;
+    
+    // 如果有上一回合的结果，显示双方卡牌
+    if (this.currentRoundInfo) {
+      // 显示区域背景
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fillRect(canvasWidth * 0.05, battleAreaY, canvasWidth * 0.9, canvasHeight * 0.22);
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(canvasWidth * 0.05, battleAreaY, canvasWidth * 0.9, canvasHeight * 0.22);
+      
+      // 玩家卡牌（左侧）
+      const playerCard = this.currentRoundInfo.playerCard;
+      const playerCardX = canvasWidth * 0.1;
+      const playerCardY = battleAreaY + canvasHeight * 0.02;
+      const miniCardWidth = canvasWidth * 0.22;
+      const miniCardHeight = canvasHeight * 0.18;
+      
+      this.drawRoundRect(ctx, playerCardX, playerCardY, miniCardWidth, miniCardHeight, 8, '#1a3a5c', '#64ffda', 2);
+      
+      // 玩家标签
+      ctx.fillStyle = '#64ffda';
+      ctx.font = 'bold ' + (canvasWidth * 0.026) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('你的卡牌', playerCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.025);
+      
+      // 玩家卡牌图标
+      ctx.fillStyle = '#64ffda';
+      ctx.font = (canvasWidth * 0.06) + 'px sans-serif';
+      ctx.fillText(playerCard ? this.getCardTypeIcon(playerCard.type) : '❌', playerCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.08);
+      
+      // 玩家卡牌名称
+      ctx.fillStyle = '#ccd6f6';
+      ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+      ctx.fillText(playerCard ? playerCard.name : '-', playerCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.135);
+      
+      // 玩家卡牌效果
+      ctx.fillStyle = '#ffd700';
+      ctx.font = (canvasWidth * 0.02) + 'px sans-serif';
+      ctx.fillText(playerCard ? `难度: ${playerCard.diff || 0}` : '-', playerCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.16);
+      
+      // VS
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold ' + (canvasWidth * 0.05) + 'px sans-serif';
+      ctx.fillText('VS', canvasWidth / 2, battleAreaY + canvasHeight * 0.11);
+      
+      // 对手卡牌（右侧）
+      const opponentCard = this.currentRoundInfo.opponentCard;
+      const opponentCardX = canvasWidth * 0.68;
+      
+      this.drawRoundRect(ctx, opponentCardX, playerCardY, miniCardWidth, miniCardHeight, 8, '#3d1f1f', '#f56565', 2);
+      
+      // 对手标签
+      ctx.fillStyle = '#f56565';
+      ctx.font = 'bold ' + (canvasWidth * 0.026) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('对手卡牌', opponentCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.025);
+      
+      // 对手卡牌图标
+      ctx.fillStyle = '#f56565';
+      ctx.font = (canvasWidth * 0.06) + 'px sans-serif';
+      ctx.fillText(opponentCard ? this.getCardTypeIcon(opponentCard.type) : '❌', opponentCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.08);
+      
+      // 对手卡牌名称
+      ctx.fillStyle = '#ccd6f6';
+      ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+      ctx.fillText(opponentCard ? opponentCard.name : '-', opponentCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.135);
+      
+      // 对手卡牌效果
+      ctx.fillStyle = '#ffd700';
+      ctx.font = (canvasWidth * 0.02) + 'px sans-serif';
+      ctx.fillText(opponentCard ? `难度: ${opponentCard.diff || 0}` : '-', opponentCardX + miniCardWidth / 2, playerCardY + canvasHeight * 0.16);
+      
+      // 判断结果
+      const result = this.currentRoundInfo.result;
+      ctx.fillStyle = result === 'win' ? '#68d391' : '#fc8181';
+      ctx.font = 'bold ' + (canvasWidth * 0.04) + 'px sans-serif';
+      ctx.fillText(result === 'win' ? '✓ 你得分！' : '✗ 对手得分！', canvasWidth / 2, battleAreaY + canvasHeight * 0.2);
+      
+      // 判断过程
+      if (this.currentRoundInfo.process) {
+        ctx.fillStyle = '#8892b0';
+        ctx.font = (canvasWidth * 0.018) + 'px sans-serif';
+        ctx.fillText(this.currentRoundInfo.process, canvasWidth / 2, battleAreaY + canvasHeight * 0.215);
+      }
+    }
+    
+    // ========== 记分板区域 ==========
+    const scoreboardY = canvasHeight * 0.44;
+
+    // 记分板背景
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    this.drawRoundRect(ctx, canvasWidth * 0.15, scoreboardY, canvasWidth * 0.7, canvasHeight * 0.14, 10, 'rgba(0, 0, 0, 0.6)', 'rgba(255, 215, 0, 0.5)', 2);
+    
+    if (this.cardBattle && this.cardBattle.state) {
+      const playerSets = this.cardBattle.state.playerSets || 0;
+      const opponentSets = this.cardBattle.state.opponentSets || 0;
+      const playerGames = this.cardBattle.state.playerGames || 0;
+      const opponentGames = this.cardBattle.state.opponentGames || 0;
+      const playerPoints = this.cardBattle.state.playerScore || 0;
+      const opponentPoints = this.cardBattle.state.opponentScore || 0;
+      
+      // 分数显示 - 网球标准计分
+      const tennisPoints = ['0', '15', '30', '40', 'Ad'];
+      const getTennisPoint = (p, opp) => {
+        if (p >= 4) {
+          if (p === opp) return '40';
+          if (p > opp) return 'Ad';
+          return '40';
+        }
+        return tennisPoints[p] || '0';
+      };
+      
+      // 玩家分数（左侧）
+      ctx.fillStyle = '#64ffda';
+      ctx.font = 'bold ' + (canvasWidth * 0.06) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(getTennisPoint(playerPoints, opponentPoints), canvasWidth * 0.3, scoreboardY + canvasHeight * 0.06);
+      ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+      ctx.fillStyle = '#8892b0';
+      ctx.fillText(`局:${playerGames} 盘:${playerSets}`, canvasWidth * 0.3, scoreboardY + canvasHeight * 0.1);
+      
+      // VS
+      ctx.fillStyle = '#ffd700';
+      ctx.font = (canvasWidth * 0.04) + 'px sans-serif';
+      ctx.fillText('VS', canvasWidth / 2, scoreboardY + canvasHeight * 0.07);
+      
+      // 对手分数（右侧）
+      ctx.fillStyle = '#f56565';
+      ctx.font = 'bold ' + (canvasWidth * 0.06) + 'px sans-serif';
+      ctx.fillText(getTennisPoint(opponentPoints, playerPoints), canvasWidth * 0.7, scoreboardY + canvasHeight * 0.06);
+      ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+      ctx.fillStyle = '#8892b0';
+      ctx.fillText(`局:${opponentGames} 盘:${opponentSets}`, canvasWidth * 0.7, scoreboardY + canvasHeight * 0.1);
+    }
+    
+    // ========== 玩家手牌区域（下方）==========
+    const playerAreaY = canvasHeight * 0.6;
+    
+    // 玩家信息背景
+    ctx.fillStyle = 'rgba(100, 255, 218, 0.1)';
+    ctx.fillRect(canvasWidth * 0.02, playerAreaY, canvasWidth * 0.96, canvasHeight * 0.32);
+    ctx.strokeStyle = 'rgba(100, 255, 218, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(canvasWidth * 0.02, playerAreaY, canvasWidth * 0.96, canvasHeight * 0.32);
+    
+    // 提示文字 - 根据当前局类型显示
+    ctx.fillStyle = isServeGame ? '#ffd700' : '#64ffda';
+    ctx.font = (canvasWidth * 0.028) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    const hintText = isServeGame ? '🎾 发球局：请选择一张发球卡' : '🎯 接发球局：请选择一张接发球卡';
+    ctx.fillText(hintText, canvasWidth / 2, playerAreaY + canvasHeight * 0.025);
+    
+    // 玩家手牌区域 - 紧凑排列，按类型分组
+    const handY = playerAreaY + canvasHeight * 0.04;
+    const cardWidth = canvasWidth * 0.14;
+    const cardHeight = canvasHeight * 0.18;
+    const cardSpacing = canvasWidth * 0.01;
+    const playerHand = this.cardBattle ? this.cardBattle.playerHand : [];
+    
+    // 过滤出当前可用的卡牌
+    const availableTypes = isServeGame ? ['serve'] : ['return'];
+    const usableCards = playerHand.filter(card => availableTypes.includes(card.type));
+    
+    // 如果没有可用卡牌，显示提示
+    if (usableCards.length === 0) {
+      ctx.fillStyle = '#fc8181';
+      ctx.font = (canvasWidth * 0.024) + 'px sans-serif';
+      ctx.fillText('没有可用的卡牌！', canvasWidth / 2, handY + cardHeight / 2);
+    } else {
+      const totalHandWidth = usableCards.length * cardWidth + (usableCards.length - 1) * cardSpacing;
+      const startX = (canvasWidth - totalHandWidth) / 2;
+      
+      for (let i = 0; i < usableCards.length; i++) {
+        const card = usableCards[i];
+        // 找到原始索引
+        const originalIndex = playerHand.indexOf(card);
+        const x = startX + i * (cardWidth + cardSpacing);
+        
+        // 绘制卡牌背景
+        const isSelected = this.selectedCardIndex === originalIndex;
+        const cardOffsetY = isSelected ? -8 : 0;
+        const finalY = handY + cardOffsetY;
+        
+        // 卡牌底色根据类型区分
+        let cardBgColor, borderColor;
+        if (card.type === 'serve') {
+          cardBgColor = isSelected ? '#805ad5' : '#1e3a5f';
+          borderColor = isSelected ? '#ffd700' : '#4299e1';
+        } else if (card.type === 'return') {
+          cardBgColor = isSelected ? '#805ad5' : '#3d1f3d';
+          borderColor = isSelected ? '#ffd700' : '#9f7aea';
+        } else {
+          cardBgColor = isSelected ? '#805ad5' : '#1a1a2e';
+          borderColor = isSelected ? '#ffd700' : 'rgba(100, 255, 218, 0.5)';
+        }
+        
+        const borderWidth = isSelected ? 3 : 2;
+        this.drawRoundRect(ctx, x, finalY, cardWidth, cardHeight, 8, cardBgColor, borderColor, borderWidth);
+        
+        // 卡牌类型图标（大）
+        ctx.fillStyle = borderColor;
+        ctx.font = (canvasWidth * 0.06) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.getCardTypeIcon(card.type), x + cardWidth / 2, finalY + cardHeight * 0.3);
+        
+        // 卡牌名称（更小）
+        ctx.fillStyle = borderColor;
+        ctx.font = 'bold ' + (canvasWidth * 0.02) + 'px sans-serif';
+        const cardName = card.name ? card.name.substring(0, 4) : '未知';
+        ctx.fillText(cardName, x + cardWidth / 2, finalY + cardHeight * 0.55);
+        
+        // 难度值
+        ctx.fillStyle = '#ffd700';
+        ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+        ctx.fillText('⚔️' + (card.diff || 0), x + cardWidth / 2, finalY + cardHeight * 0.75);
+        
+        // 稀有度标识
+        let rarityColor = '#718096';
+        if (card.rarity === 'R') rarityColor = '#4299e1';
+        else if (card.rarity === 'SR') rarityColor = '#805ad5';
+        else if (card.rarity === 'SSR') rarityColor = '#ffd700';
+        else if (card.rarity === 'UR') rarityColor = '#f56565';
+        
+        ctx.fillStyle = rarityColor;
+        ctx.fillRect(x + 3, finalY + 3, cardWidth - 6, 3);
+      }
+    }
+    
+    // 渲染按钮
+    for (const button of this.buttons) {
+      button.render(ctx);
+    }
+    
+    // 底部提示
+    ctx.fillStyle = '#8892b0';
+    ctx.font = (canvasWidth * 0.022) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    if (this.selectedCardIndex >= 0) {
+      ctx.fillText('点击"确认出牌"继续', canvasWidth / 2, canvasHeight * 0.96);
+    } else {
+      ctx.fillText('点击选择一张卡牌', canvasWidth / 2, canvasHeight * 0.96);
+    }
+  }
+  
+  // 获取卡牌类型图标
+  getCardTypeIcon(type) {
+    const icons = {
+      'serve': '🎾',
+      'return': '🎯',
+      'baseline': '🏃',
+      'volley': '🖾',
+      'dropShot': '✨',
+      'slice': '↙️',
+      'lob': '⬆️',
+      'smash': '💥',
+      'coach': '👨‍🏫',
+      'strategy': '📋',
+      'item': '🎁',
+      'ultimate': '🌟'
+    };
+    return icons[type] || '🃏';
+  }
+
+  // 处理卡牌点击
+  // 处理卡牌点击 - 炉石传说风格
+  handleCardTap(x, y) {
+    if (this.tournamentPhase !== 'cardBattle') return;
+    
+    const canvasWidth = this.game.canvasWidth || 375;
+    const canvasHeight = this.game.canvasHeight || 667;
+
+    // 炉石传说风格布局 - 玩家区域在下方
+    const playerAreaY = canvasHeight * 0.5;
+    const handY = playerAreaY + canvasHeight * 0.12;
+    const cardWidth = canvasWidth * 0.18;
+    const cardHeight = canvasHeight * 0.22;
+    const cardSpacing = canvasWidth * 0.015;
+
+    const playerHand = this.cardBattle ? this.cardBattle.playerHand : [];
+    const totalHandWidth = playerHand.length * cardWidth + (playerHand.length - 1) * cardSpacing;
+    const startX = (canvasWidth - totalHandWidth) / 2;
+
+    for (let i = 0; i < playerHand.length; i++) {
+      const cardX = startX + i * (cardWidth + cardSpacing);
+      
+      // 选中的卡牌会向上偏移10像素
+      const isSelected = this.selectedCardIndex === i;
+      const cardOffsetY = isSelected ? -10 : 0;
+      const finalHandY = handY + cardOffsetY;
+
+      if (x >= cardX && x <= cardX + cardWidth && y >= finalHandY && y <= finalHandY + cardHeight) {
+        this.selectedCardIndex = i;
+        this.setupCardBattleButtons();
+        return;
+      }
     }
   }
 

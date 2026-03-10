@@ -10,7 +10,7 @@ class SpeedTrainingScene extends Scene {
     super(game);
 
     // 游戏配置
-    this.gameDuration = 30; // 游戏时长30秒
+    this.gameDuration = 10; // 游戏时长30秒
     this.bulbDuration = 1000; // 灯泡亮起持续时间（毫秒）
     this.countdownTime = 3; // 倒计时3秒
     this.maxMisses = 3; // 最多允许点错3次

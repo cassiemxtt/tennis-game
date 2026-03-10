@@ -1,8 +1,44 @@
 /**
  * 数据模型 - Training 训练系统
- * 新版：5类训练 + 训练点数 + 瓶颈期系统
+ * 新版：5类训练 + 训练点数 + 瓶颈期系统 + 卡牌产出
  */
 const { SKILL_TYPES, SKILL_INFO } = require('./skill.js');
+const { getCardById, CARD_TYPE } = require('../data/cards.js');
+const { randomDraw } = require('../data/cards.js');
+
+// 训练产出卡牌碎片的配置
+const TRAINING_CARD_DROPS = {
+  // 力量训练产出：发球/力量相关碎片
+  strength: {
+    cardTypes: [CARD_TYPE.SERVE, CARD_TYPE.SMASH],
+    fragmentDropRate: 0.3,  // 30%概率获得碎片
+    fragmentCount: [1, 3]   // 1-3个碎片
+  },
+  // 技巧训练产出：截击/小球相关碎片
+  technique: {
+    cardTypes: [CARD_TYPE.VOLLEY, CARD_TYPE.DROP_SHOT],
+    fragmentDropRate: 0.3,
+    fragmentCount: [1, 3]
+  },
+  // 体能训练产出：底线/耐力相关碎片
+  fitness: {
+    cardTypes: [CARD_TYPE.BASELINE, CARD_TYPE.LOB],
+    fragmentDropRate: 0.3,
+    fragmentCount: [1, 3]
+  },
+  // 速度训练产出：发球/截击相关碎片
+  speed: {
+    cardTypes: [CARD_TYPE.SERVE, CARD_TYPE.VOLLEY],
+    fragmentDropRate: 0.3,
+    fragmentCount: [1, 3]
+  },
+  // 康复不产出卡牌
+  recovery: {
+    cardTypes: [],
+    fragmentDropRate: 0,
+    fragmentCount: [0, 0]
+  }
+};
 
 // 训练类型定义
 const TRAINING_TYPES = {
@@ -180,6 +216,12 @@ class Training {
       message += '\n⚠️ ' + plateauWarnings.join(' ');
     }
 
+    // 处理卡牌碎片产出
+    const cardDropResult = Training.processCardDrop(player, trainingType);
+    if (cardDropResult) {
+      message += `\n🃏 ${cardDropResult}`;
+    }
+
     return {
       success: true,
       message: message,
@@ -188,8 +230,40 @@ class Training {
       energy: training.energy,
       plateauWarnings: plateauWarnings,
       inPlateau: player.inPlateau,
-      coachBonus: trainingCoachBonus
+      coachBonus: trainingCoachBonus,
+      cardDrop: cardDropResult
     };
+  }
+
+  // 处理训练产出卡牌碎片
+  static processCardDrop(player, trainingType) {
+    const dropConfig = TRAINING_CARD_DROPS[trainingType];
+    if (!dropConfig || dropConfig.fragmentDropRate <= 0) {
+      return null;
+    }
+
+    // 随机判断是否掉落碎片
+    if (Math.random() > dropConfig.fragmentDropRate) {
+      return null;
+    }
+
+    // 随机掉落数量
+    const [minCount, maxCount] = dropConfig.fragmentCount;
+    const fragmentCount = Math.floor(Math.random() * (maxCount - minCount + 1)) + minCount;
+
+    // 随机决定稀有度（基于概率）
+    const rand = Math.random();
+    let rarity;
+    if (rand < 0.60) rarity = 'R';
+    else if (rand < 0.85) rarity = 'SR';
+    else if (rand < 0.95) rarity = 'SSR';
+    else rarity = 'UR';
+
+    // 添加碎片
+    player.cardManager.addFragment(rarity, fragmentCount);
+
+    const rarityNames = { R: '普通', SR: '稀有', SSR: '史诗', UR: '传奇' };
+    return `获得${fragmentCount}个${rarityNames[rarity]}碎片`;
   }
 
   // 获取带练教练加成（根据训练类型和应用的能力匹配）

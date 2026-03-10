@@ -118,6 +118,15 @@ class HomeScene extends Scene {
       fontSize: width * 0.035
     });
 
+    // 抽卡按钮
+    this.addButton(width * 0.38, startY + (btnHeight + spacing) * 2, btnWidth, btnHeight, '🃏 抽卡', () => {
+      this.game.changeScene(GAME_STATE.GACHA);
+    }, {
+      bgColor: '#e53e3e',
+      textColor: '#ffffff',
+      fontSize: width * 0.035
+    });
+
     // 第三行：下一周（居中，宽按钮）
     const nextBtnWidth = width * 0.6;
     this.addButton((width - nextBtnWidth) / 2, startY + (btnHeight + spacing) * 2, nextBtnWidth, btnHeight, '📅 进入下一周', () => {

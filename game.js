@@ -41,7 +41,9 @@ const GAME_STATE = {
   REST: 'rest',
   EVENT: 'event',
   COACH: 'coach',
-  ITEM: 'item'
+  ITEM: 'item',
+  GACHA: 'gacha',
+  DECK: 'deck'
 };
 
 // 游戏主类
@@ -190,7 +192,9 @@ class Game {
       rest: new RestScene(this),
       event: new EventScene(this),
       coach: new CoachScene(this),
-      item: new ItemScene(this)
+      item: new ItemScene(this),
+      gacha: new GachaScene(this),
+      deck: new DeckScene(this)
     };
   }
 
@@ -504,6 +508,8 @@ const RestScene = require('./scenes/restScene.js');
 const EventScene = require('./scenes/eventScene.js');
 const CoachScene = require('./scenes/coachScene.js');
 const ItemScene = require('./scenes/itemScene.js');
+const GachaScene = require('./scenes/gachaScene.js');
+const DeckScene = require('./scenes/deckScene.js');
 
 // 创建并启动游戏实例（关键：确保游戏运行）
 const game = new Game();

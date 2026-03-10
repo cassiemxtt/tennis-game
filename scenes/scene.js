@@ -35,7 +35,9 @@ const GAME_STATE = {
   REST: 'rest',
   EVENT: 'event',
   COACH: 'coach',
-  ITEM: 'item'  // 道具系统
+  ITEM: 'item',  // 道具系统
+  GACHA: 'gacha',  // 抽卡系统
+  DECK: 'deck'  // 卡组管理
 };
 
 class Scene {
