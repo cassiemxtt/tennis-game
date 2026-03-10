@@ -127,9 +127,9 @@ class HomeScene extends Scene {
       fontSize: width * 0.035
     });
 
-    // 第三行：下一周（居中，宽按钮）
+    // 第四行：下一周（居中，宽按钮）
     const nextBtnWidth = width * 0.6;
-    this.addButton((width - nextBtnWidth) / 2, startY + (btnHeight + spacing) * 2, nextBtnWidth, btnHeight, '📅 进入下一周', () => {
+    this.addButton((width - nextBtnWidth) / 2, startY + (btnHeight + spacing) * 3, nextBtnWidth, btnHeight, '📅 进入下一周', () => {
       this.nextWeek();
     }, {
       bgColor: PIXEL_THEME.BUTTON_NEXT,
