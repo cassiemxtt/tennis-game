@@ -6,7 +6,7 @@ const { SkillManager, SKILL_TYPES, SKILL_INFO } = require('./skill.js');
 const { Coach, COACH_LEVELS } = require('./coach.js');
 const { StrategyManager, STRATEGY_TYPES } = require('./strategy.js');
 const { InventoryManager, ITEM_TYPES } = require('./item.js');
-const { CardManager, Deck, StrategyDeck, StrategyDeckManager, STRATEGY_DECK_RULES, DECK_CARD_COUNT } = require('./deck.js');
+const { CardManager, Deck, DeckManager, StrategyDeck, StrategyDeckManager, STRATEGY_DECK_RULES, DECK_CARD_COUNT } = require('./deck.js');
 const { randomDraw } = require('../data/cards.js');
 
 class Player {
@@ -101,11 +101,52 @@ class Player {
     this.cardManager = new CardManager();
     this.currentDeck = new Deck();
     
+    // ===== 多卡组系统 =====
+    this.deckManager = new DeckManager();
+    
     // ===== 策略套牌系统 =====
     this.strategyDeckManager = new StrategyDeckManager();
     
     // 初始卡牌 - 每种类型给1张基础卡
     this.initStarterCards();
+    
+    // 初始化默认卡组
+    this.initDefaultDeck();
+  }
+  
+  // 初始化默认卡组
+  initDefaultDeck() {
+    // 创建一个默认卡组
+    const result = this.deckManager.createDeck('卡组1');
+    if (result.success && result.deck) {
+      // 将初始卡牌复制到默认卡组
+      for (const cardId of this.currentDeck.cards) {
+        result.deck.cards.push(cardId);
+      }
+    }
+  }
+  
+  // 获取卡组管理器
+  getDeckManager() {
+    return this.deckManager;
+  }
+  
+  // 获取当前选中的卡组（兼容旧代码）
+  getDeck() {
+    // 优先使用 deckManager，如果为空则使用 currentDeck
+    const activeDeck = this.deckManager.getActiveDeck();
+    return activeDeck || this.currentDeck;
+  }
+  
+  // 获取所有卡组
+  getAllDecks() {
+    return this.deckManager.getAllDecks();
+  }
+  
+  // 获取卡组卡牌列表（用于战斗）
+  getBattleCards() {
+    const deck = this.getDeck();
+    return deck ? deck.cards : [];
   }
   
   // 获取策略套牌管理器
@@ -185,19 +226,9 @@ class Player {
     return cards;
   }
   
-  // 获取当前卡组
-  getDeck() {
-    return this.currentDeck;
-  }
-  
   // 获取卡牌管理器
   getCardManager() {
     return this.cardManager;
-  }
-  
-  // 获取卡组卡牌列表（用于战斗）
-  getBattleCards() {
-    return this.currentDeck.cards;
   }
   
   // 检查是否有伤病影响
@@ -570,6 +601,8 @@ class Player {
       // 卡牌系统
       cardManager: this.cardManager ? this.cardManager.toJSON() : null,
       currentDeck: this.currentDeck ? this.currentDeck.toJSON() : null,
+      // 多卡组系统
+      deckManager: this.deckManager ? this.deckManager.toJSON() : null,
       // 策略套牌系统
       strategyDeckManager: this.strategyDeckManager ? this.strategyDeckManager.toJSON() : null
     };
@@ -621,6 +654,27 @@ class Player {
     // 恢复策略套牌系统
     if (data.strategyDeckManager) {
       player.strategyDeckManager = StrategyDeckManager.fromJSON(data.strategyDeckManager);
+    }
+    
+    // 恢复多卡组系统
+    if (data.deckManager) {
+      player.deckManager = DeckManager.fromJSON(data.deckManager);
+    }
+    
+    // 如果deckManager为空（旧存档），确保创建一个
+    if (!player.deckManager || player.deckManager.getDeckCount() === 0) {
+      // 确保deckManager存在
+      if (!player.deckManager) {
+        player.deckManager = new DeckManager();
+      }
+      
+      // 如果currentDeck有卡牌，迁移到deckManager
+      if (player.currentDeck && player.currentDeck.cards && player.currentDeck.cards.length > 0) {
+        player.initDefaultDeck();
+      } else {
+        // 创建空卡组
+        player.deckManager.createDeck('卡组1');
+      }
     }
     
     // 更新技能加成

@@ -704,13 +704,26 @@ class MatchScene extends Scene {
     if (hasCards) {
       this.addButton(canvasWidth * 0.54, canvasHeight * 0.65, canvasWidth * 0.38, canvasHeight * 0.08, '🃏 卡牌对战', () => {
         this.battleMode = 'card';
-        // 先检查是否有配置好的套牌
-        const playerDeck = player.currentDeck;
-        const deckCards = playerDeck ? playerDeck.cards : [];
-        if (deckCards.length < 3) {
+        // 检查是否有配置好的套牌（至少3张卡）
+        const deckManager = player.getDeckManager();
+        const decks = deckManager.getAllDecks();
+        let hasValidDeck = false;
+        
+        for (const deck of decks) {
+          if (deck && deck.cards && deck.cards.length >= 3) {
+            hasValidDeck = true;
+            break;
+          }
+        }
+        
+        if (!hasValidDeck) {
           this.game.showToast('套牌至少需要3张卡，请先去背包配置！');
           return;
         }
+        
+        // 重置选中的卡组
+        this.selectedDeckIndex = undefined;
+        
         // 进入套牌选择阶段
         this.tournamentPhase = 'deckSelect';
         this.setupDeckSelectButtons();
@@ -1435,15 +1448,78 @@ class MatchScene extends Scene {
     const canvasWidth = this.game.canvasWidth || 375;
     const canvasHeight = this.game.canvasHeight || 667;
     const player = this.game.player;
+    const deckManager = player.getDeckManager();
+    const decks = deckManager.getAllDecks();
     
-    // 开始卡牌对战按钮
-    this.addButton(canvasWidth * 0.25, canvasHeight * 0.75, canvasWidth * 0.5, canvasHeight * 0.08, '开始卡牌对战', () => {
-      this.startCardBattle();
-    }, {
-      bgColor: '#805ad5',
-      textColor: '#fff',
-      fontSize: canvasWidth * 0.04
-    });
+    // 获取所有有效的卡组（有至少3张卡）
+    const validDecks = [];
+    for (let i = 0; i < decks.length; i++) {
+      const deck = decks[i];
+      if (deck && deck.cards && deck.cards.length >= 3) {
+        validDecks.push({ index: i, deck: deck });
+      }
+    }
+    
+    // 为每个有效卡组添加按钮
+    const btnWidth = canvasWidth * 0.28;
+    const btnHeight = canvasHeight * 0.07;
+    const spacing = canvasWidth * 0.02;
+    const startY = canvasHeight * 0.72;
+    
+    if (validDecks.length > 0) {
+      // 如果只有1个卡组，直接使用
+      if (validDecks.length === 1) {
+        this.selectedDeckIndex = validDecks[0].index;
+        this.addButton(canvasWidth * 0.25, canvasHeight * 0.75, canvasWidth * 0.5, canvasHeight * 0.08, '开始卡牌对战', () => {
+          this.startCardBattle();
+        }, {
+          bgColor: '#805ad5',
+          textColor: '#fff',
+          fontSize: canvasWidth * 0.04
+        });
+      } else {
+        // 多个卡组，显示选择按钮
+        const totalWidth = validDecks.length * btnWidth + (validDecks.length - 1) * spacing;
+        const startX = (canvasWidth - totalWidth) / 2;
+        
+        validDecks.forEach((item, idx) => {
+          const deck = item.deck;
+          const x = startX + idx * (btnWidth + spacing);
+          const power = deckManager.calculateDeckPower(deck);
+          
+          this.addButton(x, startY, btnWidth, btnHeight, `${deck.name || '卡组' + (item.index + 1)} (战力:${power})`, () => {
+            this.selectedDeckIndex = item.index;
+            this.setupDeckSelectButtons(); // 重新渲染按钮高亮
+          }, {
+            bgColor: this.selectedDeckIndex === item.index ? '#805ad5' : '#4a5568',
+            textColor: '#fff',
+            fontSize: canvasWidth * 0.028
+          });
+        });
+        
+        // 开始卡牌对战按钮
+        this.addButton(canvasWidth * 0.25, canvasHeight * 0.82, canvasWidth * 0.5, canvasHeight * 0.08, '✓ 开始卡牌对战', () => {
+          if (this.selectedDeckIndex !== undefined) {
+            this.startCardBattle();
+          } else {
+            this.game.showToast('请先选择一个卡组');
+          }
+        }, {
+          bgColor: '#68d391',
+          textColor: '#0a192f',
+          fontSize: canvasWidth * 0.04
+        });
+      }
+    } else {
+      // 没有有效的卡组
+      this.addButton(canvasWidth * 0.25, canvasHeight * 0.75, canvasWidth * 0.5, canvasHeight * 0.08, '没有可用卡组', () => {
+        this.game.showToast('需要至少3张卡的卡组');
+      }, {
+        bgColor: '#4a5568',
+        textColor: '#718096',
+        fontSize: canvasWidth * 0.04
+      });
+    }
   }
 
   // 渲染套牌选择界面
@@ -1622,12 +1698,16 @@ class MatchScene extends Scene {
     const player = this.game.player;
     const opponent = this.currentOpponent;
     
-    // 获取玩家当前套牌
-    const playerDeck = player.currentDeck || [];
+    // 获取玩家选中的卡组
+    const deckManager = player.getDeckManager();
     let playerCards = [];
     
-    if (playerDeck && playerDeck.cards && playerDeck.cards.length > 0) {
-      playerCards = [...playerDeck.cards];
+    // 使用选中的卡组索引或默认卡组
+    const selectedDeckIndex = this.selectedDeckIndex !== undefined ? this.selectedDeckIndex : deckManager.currentDeckIndex;
+    const deck = deckManager.getDeck(selectedDeckIndex);
+    
+    if (deck && deck.cards && deck.cards.length > 0) {
+      playerCards = [...deck.cards];
     } else if (player.cardManager) {
       // 如果没有套牌，使用cardManager的卡牌
       const ownedCards = player.cardManager.getOwnedCards() || [];

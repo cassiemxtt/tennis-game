@@ -571,22 +571,45 @@ class ItemScene extends Scene {
       ctx.textAlign = 'center';
       ctx.fillText(card.name, x + cardWidth / 2, y + cardHeight * 0.2);
       
+      // 卡牌类型图标和名称映射
+      const typeConfig = {
+        'serve': { icon: '🎾', name: '发球' },
+        'return': { icon: '🎯', name: '接发' },
+        'baseline': { icon: '🏃', name: '底线' },
+        'volley': { icon: '🖾', name: '截击' },
+        'dropShot': { icon: '✨', name: '小球' },
+        'slice': { icon: '↙️', name: '切削' },
+        'lob': { icon: '⬆️', name: '高球' },
+        'smash': { icon: '💥', name: '扣杀' },
+        'coach': { icon: '👨‍🏫', name: '教练' },
+        'strategy': { icon: '📋', name: '策略' },
+        'item': { icon: '🎁', name: '道具' },
+        'ultimate': { icon: '🌟', name: '绝招' }
+      };
+      const typeInfo = typeConfig[card.type] || { icon: '❓', name: '未知' };
+      
       // 卡牌类型图标
       ctx.fillStyle = '#ffffff';
       ctx.font = `${width * 0.06}px sans-serif`;
-      const typeIcon = card.type === 'serve' ? '🎾' : (card.type === 'volley' ? '🏃' : '🎯');
-      ctx.fillText(typeIcon, x + cardWidth / 2, y + cardHeight * 0.45);
+      ctx.fillText(typeInfo.icon, x + cardWidth / 2, y + cardHeight * 0.45);
       
       // 卡牌类型名称
-      const typeName = card.type === 'serve' ? '发球' : (card.type === 'volley' ? '网前' : '战术');
       ctx.fillStyle = CONFIG.THEME.TEXT_SECONDARY;
       ctx.font = `${width * 0.024}px sans-serif`;
-      ctx.fillText(typeName, x + cardWidth / 2, y + cardHeight * 0.6);
+      ctx.fillText(typeInfo.name, x + cardWidth / 2, y + cardHeight * 0.6);
       
-      // 效果值
+      // 效果值 - 只有教练卡/道具卡/绝招卡显示特殊效果，其他显示难度(diff)
+      let effectText = '';
+      if (card.type === 'coach' || card.type === 'item' || card.type === 'ultimate') {
+        // 这些卡显示效果值
+        effectText = card.effectValue ? '+' + card.effectValue : (card.effect || '');
+      } else {
+        // 其他卡显示难度值
+        effectText = '⚔️' + (card.diff || 0);
+      }
       ctx.fillStyle = '#68d391';
-      ctx.font = `bold ${width * 0.035}px sans-serif`;
-      ctx.fillText('+' + card.effect, x + cardWidth / 2, y + cardHeight * 0.8);
+      ctx.font = `bold ${width * 0.03}px sans-serif`;
+      ctx.fillText(effectText, x + cardWidth / 2, y + cardHeight * 0.8);
       
       // 稀有度标识
       ctx.fillStyle = rarityColor;

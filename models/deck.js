@@ -445,50 +445,50 @@ class CardManager {
     return this.fragments[rarity] || 0;
   }
 
-  // 合成卡牌
-  synthesizeCard(cardId) {
-    const card = getCardById(cardId);
-    if (!card) {
-      return { success: false, message: '卡牌不存在' };
-    }
-
-    const rarityConfig = RARITY[card.rarity];
-    const needFragments = rarityConfig.合成碎片;
-
-    if (this.getFragmentCount(card.rarity) < needFragments) {
-      return { success: false, message: `需要${needFragments}个${card.rarity}碎片` };
-    }
-
-    // 扣除碎片
-    this.removeFragment(card.rarity, needFragments);
-    
-    // 添加卡牌
-    this.addCard(cardId);
-
-    return { success: true, message: `合成${card.name}成功！` };
+// 合成卡牌
+synthesizeCard(cardId) {
+  const card = getCardById(cardId);
+  if (!card) {
+    return { success: false, message: '卡牌不存在' };
   }
 
-  // 分解卡牌
-  decomposeCard(cardId) {
-    const card = getCardById(cardId);
-    if (!card) {
-      return { success: false, message: '卡牌不存在' };
-    }
+  const rarityConfig = RARITY[card.rarity];
+  const needFragments = rarityConfig.craftFragments;
 
-    // 检查是否有多余的卡牌
-    if (this.getCardCount(cardId) <= 1) {
-      return { success: false, message: '无法分解唯一的卡牌' };
-    }
-
-    // 移除卡牌
-    this.removeCard(cardId);
-    
-    // 添加碎片
-    const rarityConfig = RARITY[card.rarity];
-    this.addFragment(card.rarity, rarityConfig.分解碎片);
-
-    return { success: true, message: `分解获得${rarityConfig.分解碎片}个${card.rarity}碎片` };
+  if (this.getFragmentCount(card.rarity) < needFragments) {
+    return { success: false, message: `需要${needFragments}个${card.rarity}碎片` };
   }
+
+  // 扣除碎片
+  this.removeFragment(card.rarity, needFragments);
+  
+  // 添加卡牌
+  this.addCard(cardId);
+
+  return { success: true, message: `合成${card.name}成功！` };
+}
+
+// 分解卡牌
+decomposeCard(cardId) {
+  const card = getCardById(cardId);
+  if (!card) {
+    return { success: false, message: '卡牌不存在' };
+  }
+
+  // 检查是否有多余的卡牌
+  if (this.getCardCount(cardId) <= 1) {
+    return { success: false, message: '无法分解唯一的卡牌' };
+  }
+
+  // 移除卡牌
+  this.removeCard(cardId);
+  
+  // 添加碎片
+  const rarityConfig = RARITY[card.rarity];
+  this.addFragment(card.rarity, rarityConfig.decomposeFragments);
+
+  return { success: true, message: `分解获得${rarityConfig.decomposeFragments}个${card.rarity}碎片` };
+}
 
   // 创建新卡组
   createDeck(name = '新卡组') {
@@ -592,11 +592,136 @@ class StrategyDeckManager {
   }
 }
 
+/**
+ * 玩家卡组管理器 - 支持最多3个卡组
+ */
+class DeckManager {
+  constructor() {
+    this.decks = []; // 最多3个卡组
+    this.activeDeckIndex = 0; // 当前选中的卡组索引
+  }
+
+  // 创建一个新卡组
+  createDeck(name = '新卡组') {
+    if (this.decks.length >= 3) {
+      return { success: false, message: '最多只能创建3个卡组' };
+    }
+    const deck = new Deck();
+    deck.name = name;
+    this.decks.push(deck);
+    return { success: true, deck: deck };
+  }
+
+  // 删除一个卡组
+  deleteDeck(index) {
+    if (index < 0 || index >= this.decks.length) {
+      return { success: false, message: '卡组不存在' };
+    }
+    this.decks.splice(index, 1);
+    // 如果删除的是当前选中的卡组，重置选中索引
+    if (this.activeDeckIndex >= this.decks.length) {
+      this.activeDeckIndex = Math.max(0, this.decks.length - 1);
+    }
+    return { success: true, message: '卡组已删除' };
+  }
+
+  // 获取所有卡组
+  getAllDecks() {
+    return this.decks;
+  }
+
+  // 获取当前选中的卡组
+  getActiveDeck() {
+    return this.decks[this.activeDeckIndex] || null;
+  }
+
+  // 获取指定索引的卡组
+  getDeck(index) {
+    return this.decks[index] || null;
+  }
+
+  // 设置当前选中的卡组
+  setActiveDeck(index) {
+    if (index >= 0 && index < this.decks.length) {
+      this.activeDeckIndex = index;
+      return { success: true };
+    }
+    return { success: false, message: '卡组不存在' };
+  }
+
+  // 获取当前选中的卡组索引
+  getActiveDeckIndex() {
+    return this.activeDeckIndex;
+  }
+
+  // 获取卡组数量
+  getDeckCount() {
+    return this.decks.length;
+  }
+
+  // 是否可以创建新卡组
+  canCreateDeck() {
+    return this.decks.length < 3;
+  }
+
+  // 计算卡组综合战力
+  calculateDeckPower(deck) {
+    if (!deck || !deck.cards || deck.cards.length === 0) {
+      return 0;
+    }
+    
+    let totalPower = 0;
+    for (const cardId of deck.cards) {
+      const card = getCardById(cardId);
+      if (card) {
+        // 卡牌基础能力 = 难度 + 成功率
+        const basePower = (card.diff || 20) + (card.acc || 50);
+        totalPower += basePower;
+      }
+    }
+    
+    // 平均战力
+    return Math.floor(totalPower / deck.cards.length);
+  }
+
+  // 计算卡组获胜概率（基于战力对比）
+  calculateWinRate(deck, opponentPower) {
+    if (!deck || !deck.cards || deck.cards.length === 0) {
+      return 0;
+    }
+    
+    const myPower = this.calculateDeckPower(deck);
+    // 基础胜率50%，每1点战力差 = 0.3%胜率差
+    let winRate = 50 + (myPower - opponentPower) * 0.3;
+    // 限制范围
+    return Math.max(10, Math.min(90, winRate));
+  }
+
+  // 序列化
+  toJSON() {
+    return {
+      decks: this.decks.map(d => d.toJSON()),
+      activeDeckIndex: this.activeDeckIndex
+    };
+  }
+
+  // 反序列化
+  static fromJSON(data) {
+    const manager = new DeckManager();
+    if (data && data.decks) {
+      manager.decks = data.decks.map(d => Deck.fromJSON(d));
+      manager.activeDeckIndex = data.activeDeckIndex || 0;
+    }
+    return manager;
+  }
+}
+
 module.exports = {
   Deck,
   CardManager,
   StrategyDeck,
   StrategyDeckManager,
+  DeckManager,
   DECK_RULES,
   STRATEGY_DECK_RULES,
   DECK_ENERGY_LIMIT,

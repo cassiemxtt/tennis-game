@@ -109,7 +109,7 @@ class HomeScene extends Scene {
       fontSize: width * 0.035
     });
 
-    // 第三行：团队 | （空）| （空）
+    // 第三行：团队 | 卡组 | 抽卡
     this.addButton(width * 0.04, startY + (btnHeight + spacing) * 2, btnWidth, btnHeight, '👨‍🏫 团队', () => {
       this.game.changeScene(GAME_STATE.COACH);
     }, {
@@ -118,8 +118,17 @@ class HomeScene extends Scene {
       fontSize: width * 0.035
     });
 
+    // 卡组管理按钮
+    this.addButton(width * 0.38, startY + (btnHeight + spacing) * 2, btnWidth, btnHeight, '🎴 卡组', () => {
+      this.game.changeScene(GAME_STATE.DECK);
+    }, {
+      bgColor: '#38a169',
+      textColor: '#ffffff',
+      fontSize: width * 0.035
+    });
+
     // 抽卡按钮
-    this.addButton(width * 0.38, startY + (btnHeight + spacing) * 2, btnWidth, btnHeight, '🃏 抽卡', () => {
+    this.addButton(width * 0.72, startY + (btnHeight + spacing) * 2, btnWidth, btnHeight, '🃏 抽卡', () => {
       this.game.changeScene(GAME_STATE.GACHA);
     }, {
       bgColor: '#e53e3e',

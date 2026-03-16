@@ -29,10 +29,10 @@ const CARD_TYPE = {
 
 // 卡牌稀有度定义
 const RARITY = {
-  R: { name: 'R', color: '#ffffff',合成碎片: 10,分解碎片: 2 },
-  SR: { name: 'SR', color: '#63b3ed',合成碎片: 30,分解碎片: 8 },
-  SSR: { name: 'SSR', color: '#b794f4',合成碎片: 80,分解碎片: 20 },
-  UR: { name: 'UR', color: '#ffd700',合成碎片: 200,分解碎片: 50 }
+  R: { name: 'R', color: '#ffffff', craftFragments: 10, decomposeFragments: 2 },
+  SR: { name: 'SR', color: '#63b3ed', craftFragments: 30, decomposeFragments: 8 },
+  SSR: { name: 'SSR', color: '#b794f4', craftFragments: 80, decomposeFragments: 20 },
+  UR: { name: 'UR', color: '#ffd700', craftFragments: 200, decomposeFragments: 50 }
 };
 
 // 卡牌数据
@@ -924,7 +924,7 @@ function drawTen() {
 // 获取卡牌升级所需金币
 function getUpgradeCost(card, level) {
   const rarityConfig = RARITY[card.rarity];
-  return rarityConfig.名称 * 100 * level;
+  return rarityConfig.craftFragments * 100 * level;
 }
 
 // 获取卡牌升级效果
